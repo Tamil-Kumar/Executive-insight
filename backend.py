@@ -20,12 +20,16 @@ class LegalEngine:
         self._load_databases()
 
         # AI context slice (first 20 rows to stay within token limits)
-        self.csv_context = "\n\n".join(self.all_data_content[:20]) if self.all_data_content else "No records found."
+        if self.all_data_content:
+            self.csv_context = "\n\n".join(self.all_data_content[:20])
+        else:
+            self.csv_context = "No specific database records found."
 
-        # Modern LCEL Chain
-        template = """
+        # AI Prompt Logic (Modern LCEL Chain)
+        self.ai_template = """
         You are "Executive Insight", a professional legal research AI.
         Use the following database information to assist with the inquiry.
+        If the information isn't in the database, use your general legal knowledge but stay formal.
         
         Database Context:
         {context}
@@ -35,10 +39,13 @@ class LegalEngine:
         Disclaimer: This is for educational purposes and is not legal advice.
         Answer:"""
         
-        prompt = PromptTemplate.from_template(template)
-        self.chain = prompt | self.llm | StrOutputParser()
+        self.prompt_obj = PromptTemplate.from_template(self.ai_template)
+        
+        # Modern Chain Construction
+        self.chain = self.prompt_obj | self.llm | StrOutputParser()
 
     def _load_databases(self):
+        """Loads all CSV files listed in csv_files into memory."""
         for file in self.csv_files:
             if os.path.exists(file):
                 try:
@@ -48,18 +55,22 @@ class LegalEngine:
                         self.all_data_content.append(doc.page_content)
                 except Exception as e:
                     print(f"Error loading {file}: {e}")
+            else:
+                print(f"File not found: {file}")
 
     def query_ai(self, user_query):
-        """Invoke the AI chain with the current context."""
+        """Invokes the LangChain AI model."""
         return self.chain.invoke({"context": self.csv_context, "question": user_query})
 
     def search_records(self, query, limit=100):
-        """Filters the raw CSV data for the search tab."""
-        matches = []
+        """Filters the loaded data content based on a keyword."""
         query = query.lower()
+        matches = []
+        count = 0
         for record in self.all_data_content:
             if query in record.lower():
                 matches.append(record)
-            if len(matches) >= limit:
+                count += 1
+            if count >= limit:
                 break
         return matches
