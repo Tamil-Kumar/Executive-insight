@@ -3,6 +3,10 @@ from langchain_openai import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain_community.document_loaders.csv_loader import CSVLoader
 from langchain_core.output_parsers import StrOutputParser
+from dotenv import load_dotenv
+
+# Load the .env file
+load_dotenv()
 
 class LegalEngine:
     def __init__(self):
