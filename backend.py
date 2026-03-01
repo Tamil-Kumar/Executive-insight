@@ -1,6 +1,6 @@
 import os
 from langchain_openai import OpenAI
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from langchain_community.document_loaders.csv_loader import CSVLoader
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
