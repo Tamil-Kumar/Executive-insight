@@ -1,9 +1,9 @@
+#Hi
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import scrolledtext
 import threading
 import os
-
 # --- AI & Data Imports ---
 from langchain_openai import OpenAI
 from langchain.prompts import PromptTemplate
@@ -250,4 +250,5 @@ class LegalApp(ctk.CTk):
 
 if __name__ == "__main__":
     app = LegalApp()
+
     app.mainloop()
