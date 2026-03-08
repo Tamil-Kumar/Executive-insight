@@ -120,6 +120,191 @@ PARTY_DATA = {
     },
 }
 
+# ── Wars Data ─────────────────────────────────────────────────────────────────
+# status: "historical" | "ongoing"
+# Each entry: name, years, us_deaths, status, color_key, summary, impacts[]
+
+WARS_DATA = [
+    {
+        "name":      "Operation Epic Fury — Iran War",
+        "years":     "2026 – Ongoing",
+        "us_deaths": "6 confirmed (18+ seriously wounded)",
+        "status":    "ongoing",
+        "summary": (
+            "On February 28, 2026, the United States and Israel launched joint airstrikes "
+            "(Operation Epic Fury) against military, nuclear, and government targets across "
+            "Iran, including Tehran, Isfahan, Qom, and other cities. Supreme Leader Ali "
+            "Khamenei was killed in the initial strikes along with senior IRGC commanders. "
+            "Iran retaliated with missile and drone strikes across nine neighbouring countries. "
+            "As of March 8, 2026, major combat operations are ongoing. Trump stated a "
+            "four-to-five-week operational timeline."
+        ),
+        "impacts": [
+            ("US Casualties",          "6 service members killed in action (Army reservists in Kuwait); 18+ seriously wounded. First KIA of Trump's second term."),
+            ("Khamenei Killed",        "Supreme Leader Ali Khamenei assassinated in initial strikes — first killing of an Iranian head of state by a foreign power."),
+            ("Nuclear Programme",      "Multiple Iranian nuclear facilities destroyed or severely damaged, including sites at Natanz, Isfahan, and Fordow."),
+            ("Regional Destabilisation","Iran struck targets in Bahrain, Kuwait, UAE, Saudi Arabia, Qatar, Oman, Iraq, Jordan and Cyprus — threatening Gulf energy infrastructure."),
+            ("Oil & Markets",          "Global oil prices surged sharply; Strait of Hormuz traffic disrupted, raising fears of supply shocks."),
+            ("Diplomatic Fallout",     "Russia condemned strikes as 'unprovoked aggression'; China called for restraint; NATO allies split on support."),
+            ("War Powers Dispute",     "Democrats and some Republicans moved to force a War Powers Act vote challenging Trump's authority to strike without Congress."),
+        ],
+    },
+    {
+        "name":      "War in Afghanistan",
+        "years":     "2001 – 2021",
+        "us_deaths": "2,461",
+        "status":    "historical",
+        "summary": (
+            "Launched after the September 11 attacks, the US-led invasion toppled the Taliban "
+            "government harbouring al-Qaeda. The war became the longest in American history, "
+            "spanning four presidencies. The US withdrew in August 2021 under the Doha Agreement, "
+            "and the Taliban retook control within days."
+        ),
+        "impacts": [
+            ("Taliban Ousted & Returned",  "Taliban regime toppled in 2001; returned to full power within days of US withdrawal in August 2021."),
+            ("Al-Qaeda Disrupted",         "Al-Qaeda's operational capacity severely degraded; Osama bin Laden killed in Pakistan in 2011."),
+            ("Civilian Cost",              "Estimated 46,000+ Afghan civilians killed; 5.9 million displaced at peak of conflict."),
+            ("Financial Cost",             "Estimated $2.3 trillion total US expenditure including veteran care over decades."),
+            ("Nation-Building Failure",    "Afghan government and 300,000-strong army collapsed in days; $83B in US-funded equipment abandoned or seized."),
+            ("Veterans Crisis",            "Over 20,000 US troops wounded; ongoing PTSD and suicide epidemic among veterans."),
+        ],
+    },
+    {
+        "name":      "Iraq War",
+        "years":     "2003 – 2011 (2014–2021 re-engagement)",
+        "us_deaths": "4,431 (2003–2011) + 96 (2014–2021)",
+        "status":    "historical",
+        "summary": (
+            "The US invaded Iraq in March 2003 citing weapons of mass destruction that were "
+            "never found. Saddam Hussein's regime fell within weeks. The subsequent occupation "
+            "triggered a prolonged insurgency and sectarian civil war. The US re-engaged in "
+            "2014 to fight ISIS after it seized large swaths of Iraqi territory."
+        ),
+        "impacts": [
+            ("WMD Pretext Discredited",    "No weapons of mass destruction found; eroded US credibility and public trust in intelligence."),
+            ("Saddam Hussein Removed",     "Regime toppled; Saddam captured in December 2003 and executed in 2006."),
+            ("Sectarian Civil War",        "Power vacuum enabled Sunni–Shia–Kurdish conflict; ~150,000+ Iraqi civilian deaths 2003–2011."),
+            ("Rise of ISIS",               "Al-Qaeda in Iraq evolved into ISIS, which seized territory across Iraq and Syria by 2014."),
+            ("Financial Cost",             "Estimated $2 trillion+ in direct costs; $4–6 trillion including long-term veteran care."),
+            ("Regional Iranian Influence", "Removal of Saddam dramatically expanded Iranian influence in Iraq and across the region."),
+        ],
+    },
+    {
+        "name":      "Vietnam War",
+        "years":     "1955 – 1975",
+        "us_deaths": "58,220",
+        "status":    "historical",
+        "summary": (
+            "The US intervened to prevent the communist North from unifying Vietnam under Ho Chi Minh. "
+            "Despite massive military force, the US failed to achieve a decisive victory. The fall of "
+            "Saigon in April 1975 marked a humiliating withdrawal and profound national trauma."
+        ),
+        "impacts": [
+            ("Communist Unification",      "North Vietnam unified the country under communist rule in 1975; remained so today."),
+            ("The Draft & Protests",       "Anti-war movement reshaped American politics; widespread civil unrest and generational mistrust of government."),
+            ("War Powers Act (1973)",      "Congress passed the War Powers Resolution limiting presidential power to commit troops without approval."),
+            ("Agent Orange Legacy",        "3 million+ Vietnamese and thousands of US veterans affected by chemical defoliant exposure."),
+            ("Refugee Crisis",             "Over 800,000 Vietnamese 'boat people' fled after the war; millions more displaced."),
+            ("Military Doctrine Shift",    "Led to the all-volunteer military (1973) and the 'Vietnam Syndrome' — reluctance to commit ground troops."),
+        ],
+    },
+    {
+        "name":      "Korean War",
+        "years":     "1950 – 1953",
+        "us_deaths": "36,574",
+        "status":    "historical",
+        "summary": (
+            "After North Korea invaded South Korea in June 1950, the US led a UN coalition to "
+            "defend the South. China entered the war when US forces approached the Chinese border. "
+            "An armistice in 1953 restored the pre-war border — technically, the war never ended."
+        ),
+        "impacts": [
+            ("Divided Peninsula",          "Korea remains divided at the 38th parallel; armistice, not peace treaty, still in effect."),
+            ("US-South Korea Alliance",    "Forged a permanent security alliance; ~28,500 US troops remain stationed in South Korea today."),
+            ("Cold War Precedent",         "Established the doctrine of limited war and containment as alternatives to nuclear conflict."),
+            ("Chinese Military Prestige",  "China's ability to fight the US to a standstill elevated its global and regional standing."),
+            ("NATO Expansion",             "War accelerated West German rearmament and NATO's military buildup in Europe."),
+        ],
+    },
+    {
+        "name":      "World War II",
+        "years":     "1941 – 1945",
+        "us_deaths": "405,399",
+        "status":    "historical",
+        "summary": (
+            "The US entered WWII after the Japanese attack on Pearl Harbor on December 7, 1941. "
+            "Fighting on two fronts — Europe and the Pacific — the US played a decisive role "
+            "in defeating Nazi Germany and Imperial Japan. The war ended with atomic bombings "
+            "of Hiroshima and Nagasaki in August 1945."
+        ),
+        "impacts": [
+            ("Allied Victory",             "Defeated Nazi Germany, Fascist Italy, and Imperial Japan; liberated occupied Europe and Asia."),
+            ("Atomic Age Begins",          "US dropped atomic bombs on Hiroshima & Nagasaki — 110,000–210,000 killed; reshaped global strategy forever."),
+            ("United Nations Founded",     "Post-war order established the UN, World Bank, and IMF to prevent future global conflicts."),
+            ("US Superpower Status",       "US emerged as the world's dominant military and economic power with ~50% of global GDP."),
+            ("Holocaust & Nuremberg",      "Liberation of Nazi death camps; Nuremberg Trials established international law on war crimes."),
+            ("Cold War Origins",           "US-Soviet tensions over post-war Europe directly triggered the Cold War and nuclear arms race."),
+        ],
+    },
+    {
+        "name":      "World War I",
+        "years":     "1917 – 1918",
+        "us_deaths": "116,516",
+        "status":    "historical",
+        "summary": (
+            "The US entered WWI in April 1917 after German submarine warfare threatened US ships "
+            "and the Zimmermann Telegram revealed German overtures to Mexico. Fresh American troops "
+            "and resources tipped the balance, leading to Allied victory and the Armistice of "
+            "November 11, 1918."
+        ),
+        "impacts": [
+            ("Allied Victory",             "2 million US troops deployed to Europe; American manpower and resources were decisive in the final offensive."),
+            ("Versailles Treaty",          "Harsh reparations on Germany planted seeds for WWII; US Senate rejected the treaty and League of Nations."),
+            ("Isolationism Reaffirmed",    "US retreated into isolationism through the 1920s–30s, refusing League membership."),
+            ("Espionage & Sedition Acts",  "Sweeping domestic surveillance and suppression of anti-war speech set civil liberties precedents."),
+            ("Spanish Flu Amplified",      "Troop movements spread the 1918 influenza pandemic that killed 50–100 million worldwide."),
+        ],
+    },
+    {
+        "name":      "Gulf War",
+        "years":     "1990 – 1991",
+        "us_deaths": "383",
+        "status":    "historical",
+        "summary": (
+            "After Iraq invaded Kuwait in August 1990, a US-led coalition of 35 nations launched "
+            "Operation Desert Storm in January 1991. The 100-hour ground war liberated Kuwait and "
+            "decimated Iraq's military. President George H.W. Bush chose not to march on Baghdad."
+        ),
+        "impacts": [
+            ("Kuwait Liberated",           "Iraqi forces expelled from Kuwait in 100 hours of ground combat; ceasefire declared February 28, 1991."),
+            ("Limited Objectives Debate",  "Decision not to remove Saddam Hussein led to continued US presence and the 2003 war."),
+            ("'New World Order'",          "Bush declared a 'New World Order' of US-led collective security backed by UN mandate."),
+            ("Military Technology",        "Showcased precision-guided munitions, stealth aircraft, and network-centric warfare to the world."),
+            ("US Bases in Saudi Arabia",   "Permanent US military presence in Saudi Arabia inflamed Islamist sentiment, cited by bin Laden as a grievance."),
+        ],
+    },
+    {
+        "name":      "War on Terror / Global Operations",
+        "years":     "2001 – Present",
+        "us_deaths": "7,074+ (all post-9/11 operations)",
+        "status":    "ongoing",
+        "summary": (
+            "Following 9/11, the US launched a global counterterrorism campaign spanning "
+            "Afghanistan, Iraq, Syria, Somalia, Yemen, Libya, the Philippines, and beyond. "
+            "Operations continue today under various authorisations, targeting al-Qaeda, "
+            "ISIS, and affiliated groups."
+        ),
+        "impacts": [
+            ("Homeland Security Created",  "DHS established; TSA, FISA expansion, and PATRIOT Act transformed domestic surveillance."),
+            ("Drone Warfare Normalised",   "US drone strikes conducted in 7+ countries; set global precedent for remote targeted killing."),
+            ("Bin Laden Killed",           "Osama bin Laden killed in Abbottabad, Pakistan, on May 2, 2011 by SEAL Team Six."),
+            ("ISIS Rise & Fall",           "ISIS declared caliphate 2014; US-led coalition degraded it by 2019; leader al-Baghdadi killed."),
+            ("Civil Liberties Erosion",    "Mass surveillance programs (PRISM etc.) revealed by Snowden in 2013; ongoing legal battles."),
+            ("Veteran Mental Health",      "Estimated 30% of post-9/11 veterans experience PTSD; suicide rates exceed combat deaths."),
+        ],
+    },
+]
+
 # ── Components ─────────────────────────────────────────────────────────────────
 
 class SidebarButton(ctk.CTkButton):
@@ -165,6 +350,9 @@ class Sidebar(ctk.CTkFrame):
 
         self.btn_party = SidebarButton(self, "  Party Impact",  lambda: on_select("Party Impact"))
         self.btn_party.pack(fill="x", padx=10, pady=3)
+
+        self.btn_wars  = SidebarButton(self, "  US Wars",        lambda: on_select("US Wars"))
+        self.btn_wars.pack(fill="x", padx=10, pady=3)
 
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.pack(side="bottom", fill="x", padx=10, pady=20)
@@ -511,6 +699,265 @@ class PartyImpactPanel(ctk.CTkFrame):
             PartyCard(scroll, party_name, data).pack(fill="x", pady=(0, 16))
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  US WARS PANEL
+# ══════════════════════════════════════════════════════════════════════════════
+
+class WarCard(ctk.CTkFrame):
+    """Expandable card for a single US war."""
+
+    STATUS_COLORS = {
+        "ongoing":    "#D94A4A",   # red — active conflict
+        "historical": "#3D4357",   # dim grey
+    }
+
+    def __init__(self, master, war, **kwargs):
+        self._status_color = self.STATUS_COLORS.get(war["status"], PALETTE["border"])
+        super().__init__(
+            master,
+            fg_color=PALETTE["surface"],
+            border_color=self._status_color,
+            border_width=1,
+            corner_radius=10,
+            **kwargs
+        )
+        self.war       = war
+        self._expanded = False
+        self._build_header()
+        self._build_body()
+
+    def _build_header(self):
+        hdr = ctk.CTkFrame(self, fg_color="transparent", cursor="hand2")
+        hdr.pack(fill="x", padx=20, pady=14)
+
+        # Left colour stripe
+        stripe = ctk.CTkFrame(self, width=4, fg_color=self._status_color, corner_radius=0)
+        stripe.place(x=0, y=0, relheight=1)
+
+        left = ctk.CTkFrame(hdr, fg_color="transparent")
+        left.pack(side="left", fill="x", expand=True)
+
+        # Title row
+        title_row = ctk.CTkFrame(left, fg_color="transparent")
+        title_row.pack(fill="x")
+
+        ctk.CTkLabel(
+            title_row, text=self.war["name"],
+            font=("Georgia", 15, "bold"),
+            text_color=PALETTE["text_primary"], anchor="w"
+        ).pack(side="left")
+
+        # Status badge
+        status_text = "● ONGOING" if self.war["status"] == "ongoing" else "HISTORICAL"
+        badge = ctk.CTkFrame(title_row, fg_color=PALETTE["surface_2"],
+                              corner_radius=4, border_width=1,
+                              border_color=self._status_color)
+        badge.pack(side="left", padx=(12, 0))
+        ctk.CTkLabel(
+            badge, text=status_text,
+            font=("Courier New", 9, "bold"),
+            text_color=self._status_color
+        ).pack(padx=8, pady=3)
+
+        # Subtitle row: years + deaths
+        sub_row = ctk.CTkFrame(left, fg_color="transparent")
+        sub_row.pack(fill="x", pady=(4, 0))
+
+        ctk.CTkLabel(
+            sub_row, text=self.war["years"],
+            font=("Courier New", 10),
+            text_color=PALETTE["text_secondary"], anchor="w"
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            sub_row, text="  |  ",
+            font=("Courier New", 10),
+            text_color=PALETTE["text_dim"]
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            sub_row, text=f"US Deaths: {self.war['us_deaths']}",
+            font=("Courier New", 10, "bold"),
+            text_color=PALETTE["accent"], anchor="w"
+        ).pack(side="left")
+
+        self.toggle_btn = ctk.CTkButton(
+            hdr, text="▼  Details", width=100, height=28,
+            corner_radius=6,
+            fg_color=PALETTE["surface_2"],
+            hover_color=PALETTE["border"],
+            text_color=PALETTE["text_secondary"],
+            font=("Courier New", 10, "bold"),
+            command=self._toggle
+        )
+        self.toggle_btn.pack(side="right")
+
+        for w in (hdr, left, title_row, sub_row):
+            w.bind("<Button-1>", lambda e: self._toggle())
+
+    def _build_body(self):
+        self.body = ctk.CTkFrame(self, fg_color="transparent")
+        # hidden until expanded
+
+        # Summary paragraph
+        ctk.CTkLabel(
+            self.body,
+            text=self.war["summary"],
+            font=("Georgia", 12),
+            text_color=PALETTE["text_secondary"],
+            wraplength=860, justify="left", anchor="w"
+        ).pack(fill="x", padx=24, pady=(0, 16))
+
+        # Impact rows
+        impacts_frame = ctk.CTkFrame(
+            self.body, fg_color=PALETTE["surface_2"],
+            corner_radius=8, border_width=1, border_color=PALETTE["border"]
+        )
+        impacts_frame.pack(fill="x", padx=24, pady=(0, 20))
+
+        ctk.CTkLabel(
+            impacts_frame, text="KEY IMPACTS",
+            font=("Courier New", 9, "bold"),
+            text_color=self._status_color
+        ).pack(anchor="w", padx=16, pady=(14, 8))
+
+        for label, detail in self.war["impacts"]:
+            row = ctk.CTkFrame(impacts_frame, fg_color="transparent")
+            row.pack(fill="x", padx=16, pady=4)
+
+            dot = ctk.CTkFrame(row, width=6, height=6, corner_radius=3,
+                               fg_color=self._status_color)
+            dot.pack(side="left", padx=(0, 12))
+            dot.pack_propagate(False)
+
+            inner = ctk.CTkFrame(row, fg_color="transparent")
+            inner.pack(side="left", fill="x", expand=True)
+
+            ctk.CTkLabel(
+                inner, text=label,
+                font=("Georgia", 12, "bold"),
+                text_color=PALETTE["text_primary"], anchor="w"
+            ).pack(fill="x")
+
+            ctk.CTkLabel(
+                inner, text=detail,
+                font=("Courier New", 10),
+                text_color=PALETTE["text_secondary"],
+                wraplength=820, justify="left", anchor="w"
+            ).pack(fill="x")
+
+        ctk.CTkFrame(impacts_frame, height=12, fg_color="transparent").pack()
+
+    def _toggle(self):
+        self._expanded = not self._expanded
+        if self._expanded:
+            self.body.pack(fill="x", pady=(0, 12))
+            self.toggle_btn.configure(text="▲  Close")
+        else:
+            self.body.pack_forget()
+            self.toggle_btn.configure(text="▼  Details")
+
+
+class USWarsPanel(ctk.CTkFrame):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, fg_color="transparent", **kwargs)
+        self._build()
+
+    def _build(self):
+        # Header
+        hdr = ctk.CTkFrame(self, fg_color="transparent")
+        hdr.pack(fill="x", padx=40, pady=(40, 4))
+
+        ctk.CTkLabel(
+            hdr, text="U.S. Wars & Military Conflicts",
+            font=("Georgia", 24, "bold"),
+            text_color=PALETTE["text_primary"], anchor="w"
+        ).pack(side="left")
+
+        # Ongoing count badge
+        ongoing = sum(1 for w in WARS_DATA if w["status"] == "ongoing")
+        badge = ctk.CTkFrame(hdr, fg_color="#8A1A1A", corner_radius=4)
+        badge.pack(side="right", pady=6)
+        ctk.CTkLabel(
+            badge, text=f"  {ongoing} ACTIVE CONFLICT{'S' if ongoing != 1 else ''}  ",
+            font=("Courier New", 9, "bold"),
+            text_color="#D94A4A"
+        ).pack(pady=4)
+
+        ctk.CTkLabel(
+            self,
+            text="Historical and ongoing US military engagements — causes, US deaths, and lasting impacts.",
+            font=("Courier New", 11),
+            text_color=PALETTE["text_secondary"], anchor="w"
+        ).pack(fill="x", padx=40, pady=(0, 16))
+
+        # Death toll summary bar
+        summary = ctk.CTkFrame(self, fg_color=PALETTE["surface_2"],
+                                corner_radius=8, border_width=1,
+                                border_color=PALETTE["border"])
+        summary.pack(fill="x", padx=40, pady=(0, 20))
+
+        inner = ctk.CTkFrame(summary, fg_color="transparent")
+        inner.pack(fill="x", padx=16, pady=12)
+
+        ctk.CTkLabel(
+            inner,
+            text="⚠  Figures are historically documented totals. Iran War deaths reflect confirmed US KIA as of March 8, 2026 — the conflict is ongoing and figures will change.",
+            font=("Courier New", 10),
+            text_color=PALETTE["text_dim"],
+            wraplength=900, justify="left", anchor="w"
+        ).pack(fill="x")
+
+        # Filter row
+        filter_row = ctk.CTkFrame(self, fg_color="transparent")
+        filter_row.pack(fill="x", padx=40, pady=(0, 12))
+
+        ctk.CTkLabel(
+            filter_row, text="FILTER:",
+            font=("Courier New", 9, "bold"),
+            text_color=PALETTE["text_dim"]
+        ).pack(side="left", padx=(0, 10))
+
+        self._filter_var = ctk.StringVar(value="All")
+        for label in ("All", "Ongoing", "Historical"):
+            ctk.CTkButton(
+                filter_row,
+                text=label,
+                width=90, height=26,
+                corner_radius=6,
+                fg_color=PALETTE["surface_2"],
+                hover_color=PALETTE["border"],
+                text_color=PALETTE["text_secondary"],
+                font=("Courier New", 10, "bold"),
+                command=lambda l=label: self._apply_filter(l)
+            ).pack(side="left", padx=(0, 6))
+
+        # Scrollable war cards
+        self.scroll = ctk.CTkScrollableFrame(
+            self, fg_color="transparent",
+            scrollbar_button_color=PALETTE["border"],
+            scrollbar_fg_color=PALETTE["surface"],
+        )
+        self.scroll.pack(fill="both", expand=True, padx=40, pady=(0, 32))
+
+        self._cards = []
+        for war in WARS_DATA:
+            card = WarCard(self.scroll, war)
+            card.pack(fill="x", pady=(0, 12))
+            self._cards.append((war["status"], card))
+
+    def _apply_filter(self, label):
+        for status, card in self._cards:
+            if label == "All":
+                card.pack(fill="x", pady=(0, 12))
+            elif label == "Ongoing" and status == "ongoing":
+                card.pack(fill="x", pady=(0, 12))
+            elif label == "Historical" and status == "historical":
+                card.pack(fill="x", pady=(0, 12))
+            else:
+                card.pack_forget()
+
+
 class SettingsPanel(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master, fg_color="transparent")
@@ -574,6 +1021,7 @@ class ExecutiveInsight(ctk.CTk):
             "Legal Q&A":    LegalQAPanel(self.content_area, self.engine),
             "Bills":        BillsPanel(self.content_area, self.engine),
             "Party Impact": PartyImpactPanel(self.content_area),
+            "US Wars":      USWarsPanel(self.content_area),
             "Settings":     SettingsPanel(self.content_area),
         }
 
