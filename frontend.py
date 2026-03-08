@@ -1,6 +1,8 @@
 import customtkinter as ctk
 import threading
 import tkinter as tk
+import os
+import csv
 from backend import LegalEngine  
 
 # ── Appearance ─────────────────────────────────────────────────────────────────
@@ -557,44 +559,400 @@ class LegalQAPanel(ctk.CTkFrame):
 
 
 class BillsPanel(ctk.CTkFrame):
+    # Map display name → CSV filename (relative to this file)
+    SOURCES = {
+        "Trump 2nd Term":  "trump2.csv",
+        "Trump 1st Term":  "trump_eos.csv",
+        "Biden":           "biden.csv",
+        "Obama":           "obama.csv",
+        "W. Bush":         "w_bush.csv",
+        "Clinton":         "clinton.csv",
+        "H.W. Bush":       "h_w_bush.csv",
+        "Reagan":          "reagan.csv",
+        "Carter":          "carter.csv",
+        "Ford":            "ford.csv",
+        "Nixon":           "nixon.csv",
+        "Johnson":         "johnson.csv",
+        "Kennedy":         "kennedy.csv",
+        "Eisenhower":      "eisenhower.csv",
+        "Truman":          "truman.csv",
+        "Roosevelt":       "roosevelt.csv",
+        "Historical":      "past.csv",
+    }
+
+    # Party colour mapping
+    PARTY_COLORS = {
+        "Trump 2nd Term":  "#D94A4A",
+        "Trump 1st Term":  "#D94A4A",
+        "Biden":           "#4A90D9",
+        "Obama":           "#4A90D9",
+        "W. Bush":         "#D94A4A",
+        "Clinton":         "#4A90D9",
+        "H.W. Bush":       "#D94A4A",
+        "Reagan":          "#D94A4A",
+        "Carter":          "#4A90D9",
+        "Ford":            "#D94A4A",
+        "Nixon":           "#D94A4A",
+        "Johnson":         "#4A90D9",
+        "Kennedy":         "#4A90D9",
+        "Eisenhower":      "#D94A4A",
+        "Truman":          "#4A90D9",
+        "Roosevelt":       "#4A90D9",
+        "Historical":      "#7A8099",
+    }
+
     def __init__(self, master, engine):
         super().__init__(master, fg_color="transparent")
-        self.engine = engine
+        self.engine      = engine
+        self._all_rows   = []   # full loaded dataset for current president
+        self._filtered   = []   # rows after search/type filter
+        self._current_president = list(self.SOURCES.keys())[0]
+        self._base_dir   = os.path.dirname(os.path.abspath(__file__))
+        self._build()
 
-        ctk.CTkLabel(self, text="Legislative Tracking", font=("Georgia", 24, "bold"),
-                     text_color=PALETTE["text_primary"]).pack(anchor="w", padx=40, pady=(40, 20))
+    def _build(self):
+        import csv as _csv
+        self._csv = _csv
 
-        search_frame = ctk.CTkFrame(self, fg_color=PALETTE["surface"],
-                                     border_color=PALETTE["border"], border_width=1)
-        search_frame.pack(fill="x", padx=40, pady=10)
+        # ── Header ────────────────────────────────────────────────────────
+        hdr = ctk.CTkFrame(self, fg_color="transparent")
+        hdr.pack(fill="x", padx=40, pady=(32, 0))
 
-        self.search_entry = ctk.CTkEntry(
-            search_frame,
-            placeholder_text="Filter database by keywords (e.g. 'Sanctions', 'Space')...",
-            fg_color="transparent", border_width=0, font=("Georgia", 13)
+        ctk.CTkLabel(hdr, text="Executive Orders Database",
+                     font=("Georgia", 24, "bold"),
+                     text_color=PALETTE["text_primary"], anchor="w").pack(side="left")
+
+        self._count_badge = ctk.CTkFrame(hdr, fg_color=PALETTE["surface_2"],
+                                          corner_radius=4, border_width=1,
+                                          border_color=PALETTE["border"])
+        self._count_badge.pack(side="right", pady=6)
+        self._count_lbl = ctk.CTkLabel(self._count_badge, text="",
+                                        font=("Courier New", 9, "bold"),
+                                        text_color=PALETTE["text_dim"])
+        self._count_lbl.pack(padx=10, pady=4)
+
+        ctk.CTkLabel(self, text="Browse, search, and filter every presidential executive order on record.",
+                     font=("Courier New", 11), text_color=PALETTE["text_secondary"],
+                     anchor="w").pack(fill="x", padx=40, pady=(4, 16))
+
+        # ── President selector tabs (scrollable row) ──────────────────────
+        tab_outer = ctk.CTkFrame(self, fg_color=PALETTE["surface"],
+                                  corner_radius=8, border_width=1,
+                                  border_color=PALETTE["border"])
+        tab_outer.pack(fill="x", padx=40, pady=(0, 14))
+
+        tab_canvas = tk.Canvas(tab_outer, height=46, bg=PALETTE["surface"],
+                                highlightthickness=0)
+        tab_canvas.pack(side="left", fill="x", expand=True)
+
+        tab_scroll = tk.Scrollbar(tab_outer, orient="horizontal",
+                                   command=tab_canvas.xview)
+        tab_scroll.pack(side="bottom", fill="x")
+        tab_canvas.configure(xscrollcommand=tab_scroll.set)
+
+        self._tab_inner = tk.Frame(tab_canvas, bg=PALETTE["surface"])
+        self._tab_win   = tab_canvas.create_window((0, 0), window=self._tab_inner,
+                                                    anchor="nw")
+
+        def _on_tab_configure(e):
+            tab_canvas.configure(scrollregion=tab_canvas.bbox("all"))
+        self._tab_inner.bind("<Configure>", _on_tab_configure)
+
+        self._tab_btns = {}
+        for name in self.SOURCES:
+            color = self.PARTY_COLORS.get(name, PALETTE["text_secondary"])
+            btn = tk.Button(
+                self._tab_inner, text=name,
+                bg=PALETTE["surface"], fg=PALETTE["text_secondary"],
+                activebackground=PALETTE["surface_2"], activeforeground=color,
+                relief="flat", cursor="hand2", padx=10, pady=8,
+                font=("Courier New", 10),
+                command=lambda n=name: self._select_president(n)
+            )
+            btn.pack(side="left", padx=2, pady=4)
+            self._tab_btns[name] = btn
+
+        # ── Search & filter bar ───────────────────────────────────────────
+        bar = ctk.CTkFrame(self, fg_color=PALETTE["surface"],
+                            corner_radius=8, border_width=1,
+                            border_color=PALETTE["border"])
+        bar.pack(fill="x", padx=40, pady=(0, 12))
+
+        self._search_entry = ctk.CTkEntry(
+            bar, placeholder_text="Search titles, EO numbers, disposition notes...",
+            placeholder_text_color=PALETTE["text_dim"],
+            fg_color="transparent", border_width=0,
+            text_color=PALETTE["text_primary"], font=("Georgia", 13)
         )
-        self.search_entry.pack(side="left", fill="both", expand=True, padx=20)
+        self._search_entry.pack(side="left", fill="x", expand=True, padx=16, pady=10)
+        self._search_entry.bind("<Return>", lambda e: self._apply_filter())
+        self._search_entry.bind("<KeyRelease>", lambda e: self._apply_filter())
+
+        # Type filter
+        self._type_var = ctk.StringVar(value="All Types")
+        self._type_menu = ctk.CTkOptionMenu(
+            bar, variable=self._type_var,
+            values=["All Types", "Executive Order", "Proclamation",
+                    "Memorandum", "Notice", "Other"],
+            width=160, height=32, corner_radius=6,
+            fg_color=PALETTE["surface_2"],
+            button_color=PALETTE["border"],
+            button_hover_color=PALETTE["accent_dim"],
+            dropdown_fg_color=PALETTE["surface_2"],
+            dropdown_text_color=PALETTE["text_primary"],
+            dropdown_hover_color=PALETTE["border"],
+            text_color=PALETTE["text_primary"],
+            font=("Courier New", 11),
+            command=lambda _: self._apply_filter()
+        )
+        self._type_menu.pack(side="right", padx=(6, 12), pady=8)
 
         ctk.CTkButton(
-            search_frame, text="SEARCH RECORDS",
-            fg_color=PALETTE["accent"], text_color=PALETTE["bg"],
-            font=("Courier New", 11, "bold"), width=150, command=self.do_search
-        ).pack(side="right", padx=10, pady=10)
+            bar, text="Clear",
+            width=60, height=32, corner_radius=6,
+            fg_color=PALETTE["surface_2"], hover_color=PALETTE["border"],
+            text_color=PALETTE["text_secondary"],
+            font=("Courier New", 10, "bold"),
+            command=self._clear_search
+        ).pack(side="right", padx=(0, 6), pady=8)
 
-        self.results_box = ctk.CTkTextbox(
-            self, fg_color=PALETTE["surface"], border_color=PALETTE["border"],
-            border_width=1, text_color=PALETTE["text_secondary"], font=("Courier New", 12)
+        # ── Column headers ────────────────────────────────────────────────
+        col_hdr = ctk.CTkFrame(self, fg_color="transparent")
+        col_hdr.pack(fill="x", padx=40, pady=(0, 4))
+        col_hdr.columnconfigure(0, weight=0, minsize=70)
+        col_hdr.columnconfigure(1, weight=3)
+        col_hdr.columnconfigure(2, weight=1, minsize=110)
+        col_hdr.columnconfigure(3, weight=1, minsize=110)
+
+        for i, label in enumerate(("EO #", "TITLE", "TYPE", "SIGNED")):
+            ctk.CTkLabel(col_hdr, text=label,
+                         font=("Courier New", 9, "bold"),
+                         text_color=PALETTE["text_dim"], anchor="w"
+                         ).grid(row=0, column=i, sticky="w", padx=6)
+
+        # ── Results list ──────────────────────────────────────────────────
+        self._list_frame = ctk.CTkScrollableFrame(
+            self, fg_color=PALETTE["surface"],
+            corner_radius=8, border_width=1, border_color=PALETTE["border"],
+            scrollbar_button_color=PALETTE["border"],
         )
-        self.results_box.pack(fill="both", expand=True, padx=40, pady=(10, 40))
+        self._list_frame.pack(fill="both", expand=True, padx=40, pady=(0, 8))
 
-    def do_search(self):
-        query = self.search_entry.get()
-        results = self.engine.search_records(query, limit=20)
-        self.results_box.delete("1.0", "end")
-        if not results:
-            self.results_box.insert("end", "No matching records found.")
-        for r in results:
-            self.results_box.insert("end", f"• {r}\n\n")
+        # ── Detail panel (hidden until a row is clicked) ──────────────────
+        self._detail_panel = ctk.CTkFrame(
+            self, fg_color=PALETTE["surface_2"],
+            corner_radius=8, border_width=1, border_color=PALETTE["accent"]
+        )
+        # packed on demand
+
+        self._detail_title = ctk.CTkLabel(
+            self._detail_panel, text="",
+            font=("Georgia", 13, "bold"),
+            text_color=PALETTE["text_primary"],
+            wraplength=900, justify="left", anchor="w"
+        )
+        self._detail_title.pack(fill="x", padx=20, pady=(16, 4))
+
+        detail_meta = ctk.CTkFrame(self._detail_panel, fg_color="transparent")
+        detail_meta.pack(fill="x", padx=20, pady=(0, 4))
+        self._detail_meta = ctk.CTkLabel(detail_meta, text="",
+                                          font=("Courier New", 10),
+                                          text_color=PALETTE["text_secondary"], anchor="w")
+        self._detail_meta.pack(side="left")
+
+        self._detail_notes = ctk.CTkLabel(
+            self._detail_panel, text="",
+            font=("Courier New", 10),
+            text_color=PALETTE["text_dim"],
+            wraplength=900, justify="left", anchor="w"
+        )
+        self._detail_notes.pack(fill="x", padx=20, pady=(0, 16))
+
+        close_btn = ctk.CTkButton(
+            self._detail_panel, text="✕ Close", width=70, height=24,
+            corner_radius=4,
+            fg_color=PALETTE["border"], hover_color=PALETTE["surface"],
+            text_color=PALETTE["text_secondary"],
+            font=("Courier New", 10, "bold"),
+            command=self._hide_detail
+        )
+        close_btn.place(relx=1.0, y=8, anchor="ne", x=-12)
+
+        # Load default president
+        self._select_president(self._current_president)
+
+    # ── Data loading ──────────────────────────────────────────────────────────
+    def _load_csv(self, name):
+        import csv
+        filename = self.SOURCES[name]
+        # look beside this file first, then uploads folder
+        for folder in (self._base_dir,
+                       "/mnt/user-data/uploads",
+                       "/mnt/user-data/outputs"):
+            path = os.path.join(folder, filename)
+            if os.path.exists(path):
+                with open(path, encoding="utf-8", errors="replace") as f:
+                    return list(csv.DictReader(f))
+        return []
+
+    # ── Tab selection ─────────────────────────────────────────────────────────
+    def _select_president(self, name):
+        self._current_president = name
+        self._hide_detail()
+
+        # Update tab highlight
+        active_color = self.PARTY_COLORS.get(name, PALETTE["accent"])
+        for n, btn in self._tab_btns.items():
+            if n == name:
+                btn.configure(bg=PALETTE["surface_2"], fg=active_color,
+                              font=("Courier New", 10, "bold"))
+            else:
+                btn.configure(bg=PALETTE["surface"], fg=PALETTE["text_secondary"],
+                              font=("Courier New", 10))
+
+        self._all_rows = self._load_csv(name)
+        self._search_entry.delete(0, "end")
+        self._type_var.set("All Types")
+        self._apply_filter()
+
+    # ── Filter / search ───────────────────────────────────────────────────────
+    def _apply_filter(self):
+        q      = self._search_entry.get().strip().lower()
+        t_filt = self._type_var.get()
+
+        results = []
+        for row in self._all_rows:
+            subtype = row.get("subtype", "").strip()
+            title   = row.get("title", "")
+            eo_num  = str(row.get("executive_order_number", ""))
+            notes   = row.get("disposition_notes", "")
+
+            # Type filter
+            if t_filt != "All Types":
+                if t_filt == "Executive Order" and "Executive Order" not in subtype:
+                    continue
+                elif t_filt == "Proclamation" and "Proclamation" not in subtype:
+                    continue
+                elif t_filt == "Memorandum" and "Memorandum" not in subtype:
+                    continue
+                elif t_filt == "Notice" and "Notice" not in subtype:
+                    continue
+                elif t_filt == "Other" and subtype in ("Executive Order", "Proclamation",
+                                                        "Memorandum", "Notice"):
+                    continue
+
+            # Text search
+            if q and q not in title.lower() and q not in eo_num and q not in notes.lower():
+                continue
+
+            results.append(row)
+
+        self._filtered = results
+        self._render_rows()
+
+    def _clear_search(self):
+        self._search_entry.delete(0, "end")
+        self._type_var.set("All Types")
+        self._apply_filter()
+
+    # ── Render rows into the list frame ──────────────────────────────────────
+    def _render_rows(self):
+        # Clear existing rows
+        for w in self._list_frame.winfo_children():
+            w.destroy()
+
+        color = self.PARTY_COLORS.get(self._current_president, PALETTE["accent"])
+        total = len(self._all_rows)
+        shown = len(self._filtered)
+        self._count_lbl.configure(
+            text=f"  {shown:,} of {total:,} RECORDS — {self._current_president}  "
+        )
+
+        if not self._filtered:
+            ctk.CTkLabel(self._list_frame, text="No records match your search.",
+                         font=("Courier New", 12),
+                         text_color=PALETTE["text_dim"]).pack(pady=40)
+            return
+
+        for row in self._filtered:
+            self._make_row(row, color)
+
+    def _make_row(self, row, color):
+        eo_num  = str(row.get("executive_order_number", "")).strip() or "—"
+        title   = row.get("title", "Untitled").strip()
+        subtype = row.get("subtype", "").strip() or "Document"
+        signed  = row.get("signing_date", "").strip() or row.get("publication_date", "").strip()
+
+        frame = ctk.CTkFrame(self._list_frame, fg_color="transparent",
+                              cursor="hand2")
+        frame.pack(fill="x", pady=1)
+        frame.columnconfigure(0, weight=0, minsize=70)
+        frame.columnconfigure(1, weight=3)
+        frame.columnconfigure(2, weight=1, minsize=110)
+        frame.columnconfigure(3, weight=1, minsize=110)
+
+        ctk.CTkLabel(frame, text=eo_num,
+                     font=("Courier New", 11, "bold"),
+                     text_color=color, anchor="w"
+                     ).grid(row=0, column=0, sticky="w", padx=(10, 4), pady=6)
+
+        ctk.CTkLabel(frame, text=title,
+                     font=("Georgia", 12),
+                     text_color=PALETTE["text_primary"], anchor="w"
+                     ).grid(row=0, column=1, sticky="ew", padx=4, pady=6)
+
+        ctk.CTkLabel(frame, text=subtype,
+                     font=("Courier New", 10),
+                     text_color=PALETTE["text_secondary"], anchor="w"
+                     ).grid(row=0, column=2, sticky="w", padx=4, pady=6)
+
+        ctk.CTkLabel(frame, text=signed,
+                     font=("Courier New", 10),
+                     text_color=PALETTE["text_dim"], anchor="w"
+                     ).grid(row=0, column=3, sticky="w", padx=(4, 10), pady=6)
+
+        # Divider
+        ctk.CTkFrame(self._list_frame, height=1,
+                     fg_color=PALETTE["border"], corner_radius=0).pack(fill="x", padx=8)
+
+        # Click to expand detail
+        def _click(e, r=row):
+            self._show_detail(r)
+
+        for w in frame.winfo_children():
+            w.bind("<Button-1>", _click)
+        frame.bind("<Button-1>", _click)
+
+        # Hover effect
+        def _enter(e, f=frame):
+            f.configure(fg_color=PALETTE["surface_2"])
+        def _leave(e, f=frame):
+            f.configure(fg_color="transparent")
+        frame.bind("<Enter>", _enter)
+        frame.bind("<Leave>", _leave)
+
+    # ── Detail panel ──────────────────────────────────────────────────────────
+    def _show_detail(self, row):
+        title   = row.get("title", "").strip()
+        eo_num  = str(row.get("executive_order_number", "")).strip()
+        subtype = row.get("subtype", "").strip()
+        signed  = row.get("signing_date", "").strip()
+        pub     = row.get("publication_date", "").strip()
+        notes   = row.get("disposition_notes", "").strip()
+        html    = row.get("html_url", "").strip()
+
+        self._detail_title.configure(text=title or "Untitled")
+        meta = f"EO #{eo_num}  •  {subtype}  •  Signed: {signed}  •  Published: {pub}"
+        if html:
+            meta += f"  •  {html}"
+        self._detail_meta.configure(text=meta)
+        self._detail_notes.configure(
+            text=f"Disposition: {notes}" if notes else "No disposition notes recorded."
+        )
+        self._detail_panel.pack(fill="x", padx=40, pady=(0, 16))
+
+    def _hide_detail(self):
+        self._detail_panel.pack_forget()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
