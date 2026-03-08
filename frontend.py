@@ -7,26 +7,113 @@ from backend import LegalEngine
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
-# ── Design Tokens ──────────────────────────────────────────────────────────────
-PALETTE = {
-    "bg":            "#0D0F14",
-    "surface":       "#13161E",
-    "surface_2":     "#1B1F2B",
-    "border":        "#252A38",
-    "accent":        "#C9A84C",
-    "accent_dim":    "#8A6E2F",
-    "text_primary":  "#E8E6DF",
-    "text_secondary":"#7A8099",
-    "text_dim":      "#3D4357",
-    "positive":      "#3DAA72",
-    "warning":       "#C9A84C",
-    "dem_blue":      "#1A4F8A",
-    "dem_light":     "#4A90D9",
-    "rep_red":       "#8A1A1A",
-    "rep_light":     "#D94A4A",
-    "ind_purple":    "#5A3A8A",
-    "ind_light":     "#9B72D4",
+# ── Theme Presets ──────────────────────────────────────────────────────────────
+THEMES = {
+    "Executive Dark": {
+        "bg":            "#0D0F14",
+        "surface":       "#13161E",
+        "surface_2":     "#1B1F2B",
+        "border":        "#252A38",
+        "accent":        "#C9A84C",
+        "accent_dim":    "#8A6E2F",
+        "text_primary":  "#E8E6DF",
+        "text_secondary":"#7A8099",
+        "text_dim":      "#3D4357",
+        "positive":      "#3DAA72",
+        "warning":       "#C9A84C",
+        "dem_blue":      "#1A4F8A",
+        "dem_light":     "#4A90D9",
+        "rep_red":       "#8A1A1A",
+        "rep_light":     "#D94A4A",
+        "ind_purple":    "#5A3A8A",
+        "ind_light":     "#9B72D4",
+        "ctk_mode":      "Dark",
+    },
+    "Midnight Blue": {
+        "bg":            "#070D1A",
+        "surface":       "#0D1628",
+        "surface_2":     "#132035",
+        "border":        "#1E2E4A",
+        "accent":        "#4FC3F7",
+        "accent_dim":    "#2A7DA8",
+        "text_primary":  "#E3EEF7",
+        "text_secondary":"#6A8BAA",
+        "text_dim":      "#2E3F55",
+        "positive":      "#43C98A",
+        "warning":       "#F7C948",
+        "dem_blue":      "#1A4F8A",
+        "dem_light":     "#4A90D9",
+        "rep_red":       "#8A1A1A",
+        "rep_light":     "#D94A4A",
+        "ind_purple":    "#5A3A8A",
+        "ind_light":     "#9B72D4",
+        "ctk_mode":      "Dark",
+    },
+    "Forest": {
+        "bg":            "#0A1209",
+        "surface":       "#111A10",
+        "surface_2":     "#182518",
+        "border":        "#243524",
+        "accent":        "#7EC850",
+        "accent_dim":    "#4E8230",
+        "text_primary":  "#E2ECD8",
+        "text_secondary":"#6A8A60",
+        "text_dim":      "#2E4228",
+        "positive":      "#50C87E",
+        "warning":       "#C8B450",
+        "dem_blue":      "#1A4F8A",
+        "dem_light":     "#4A90D9",
+        "rep_red":       "#8A1A1A",
+        "rep_light":     "#D94A4A",
+        "ind_purple":    "#5A3A8A",
+        "ind_light":     "#9B72D4",
+        "ctk_mode":      "Dark",
+    },
+    "Ivory (Light)": {
+        "bg":            "#F4F0E8",
+        "surface":       "#EDEAE0",
+        "surface_2":     "#E2DDD2",
+        "border":        "#C8C2B4",
+        "accent":        "#8B4513",
+        "accent_dim":    "#5C2D0A",
+        "text_primary":  "#1A1612",
+        "text_secondary":"#5A5040",
+        "text_dim":      "#A89A88",
+        "positive":      "#2E7D32",
+        "warning":       "#8B6914",
+        "dem_blue":      "#1A4F8A",
+        "dem_light":     "#1565C0",
+        "rep_red":       "#8A1A1A",
+        "rep_light":     "#C62828",
+        "ind_purple":    "#5A3A8A",
+        "ind_light":     "#6A1B9A",
+        "ctk_mode":      "Light",
+    },
+    "Crimson": {
+        "bg":            "#130808",
+        "surface":       "#1E0D0D",
+        "surface_2":     "#2A1212",
+        "border":        "#3D1A1A",
+        "accent":        "#E05252",
+        "accent_dim":    "#A03030",
+        "text_primary":  "#F0E0E0",
+        "text_secondary":"#9A6A6A",
+        "text_dim":      "#4A2A2A",
+        "positive":      "#52A070",
+        "warning":       "#E0A052",
+        "dem_blue":      "#1A4F8A",
+        "dem_light":     "#4A90D9",
+        "rep_red":       "#8A1A1A",
+        "rep_light":     "#D94A4A",
+        "ind_purple":    "#5A3A8A",
+        "ind_light":     "#9B72D4",
+        "ctk_mode":      "Dark",
+    },
 }
+
+# ── Active palette (mutable — updated on theme change) ────────────────────────
+PALETTE = dict(THEMES["Executive Dark"])
+CURRENT_THEME = ["Executive Dark"]  # mutable container so panels can read it
 
 # ── Party Data ────────────────────────────────────────────────────────────────
 
@@ -328,6 +415,7 @@ class Sidebar(ctk.CTkFrame):
     def __init__(self, master, on_select):
         super().__init__(master, fg_color=PALETTE["surface"], width=240, corner_radius=0)
         self.on_select = on_select
+        self._active   = None
 
         brand_frame = ctk.CTkFrame(self, fg_color="transparent")
         brand_frame.pack(fill="x", padx=20, pady=30)
@@ -339,28 +427,42 @@ class Sidebar(ctk.CTkFrame):
 
         ctk.CTkFrame(self, height=1, fg_color=PALETTE["border"]).pack(fill="x", padx=16, pady=(0, 10))
 
-        self.btn_dash  = SidebarButton(self, "  Dashboard",    lambda: on_select("Dashboard"))
-        self.btn_dash.pack(fill="x", padx=10, pady=3)
+        self._nav_btns = {}
 
-        self.btn_qa    = SidebarButton(self, "  Legal Q&A",    lambda: on_select("Legal Q&A"))
-        self.btn_qa.pack(fill="x", padx=10, pady=3)
-
-        self.btn_bills = SidebarButton(self, "  Bills",         lambda: on_select("Bills"))
-        self.btn_bills.pack(fill="x", padx=10, pady=3)
-
-        self.btn_party = SidebarButton(self, "  Party Impact",  lambda: on_select("Party Impact"))
-        self.btn_party.pack(fill="x", padx=10, pady=3)
-
-        self.btn_wars  = SidebarButton(self, "  US Wars",        lambda: on_select("US Wars"))
-        self.btn_wars.pack(fill="x", padx=10, pady=3)
-
-        self.btn_gov   = SidebarButton(self, "  Gov. History",   lambda: on_select("Gov. History"))
-        self.btn_gov.pack(fill="x", padx=10, pady=3)
+        nav_items = [
+            ("Dashboard",   "  Dashboard"),
+            ("Legal Q&A",   "  Legal Q&A"),
+            ("Bills",       "  Bills"),
+            ("Party Impact","  Party Impact"),
+            ("US Wars",     "  US Wars"),
+            ("Gov. History","  Gov. History"),
+        ]
+        for key, label in nav_items:
+            btn = SidebarButton(self, label, lambda k=key: on_select(k))
+            btn.pack(fill="x", padx=10, pady=3)
+            self._nav_btns[key] = btn
 
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.pack(side="bottom", fill="x", padx=10, pady=20)
         ctk.CTkFrame(footer, height=1, fg_color=PALETTE["border"]).pack(fill="x", pady=(0, 10))
-        SidebarButton(footer, "  Settings", lambda: on_select("Settings")).pack(fill="x")
+        settings_btn = SidebarButton(footer, "  Settings", lambda: on_select("Settings"))
+        settings_btn.pack(fill="x")
+        self._nav_btns["Settings"] = settings_btn
+
+    def set_active(self, name):
+        """Highlight the active nav button, reset all others."""
+        for key, btn in self._nav_btns.items():
+            if key == name:
+                btn.configure(
+                    fg_color=PALETTE["surface_2"],
+                    text_color=PALETTE["accent"],
+                )
+            else:
+                btn.configure(
+                    fg_color="transparent",
+                    text_color=PALETTE["text_secondary"],
+                )
+        self._active = name
 
 
 # ── Panels ────────────────────────────────────────────────────────────────────
@@ -1856,37 +1958,124 @@ class GovHistoryPanel(ctk.CTkFrame):
 
 
 class SettingsPanel(ctk.CTkFrame):
-    def __init__(self, master):
-        super().__init__(master, fg_color="transparent")
+    def __init__(self, master, on_theme_change, **kwargs):
+        super().__init__(master, fg_color="transparent", **kwargs)
+        self.on_theme_change = on_theme_change
+        self._build()
 
+    def _build(self):
         ctk.CTkLabel(self, text="Preferences", font=("Georgia", 24, "bold"),
                      text_color=PALETTE["text_primary"]).pack(anchor="w", padx=40, pady=(40, 20))
 
         container = ctk.CTkFrame(self, fg_color=PALETTE["surface"],
-                                  border_color=PALETTE["border"], border_width=1)
-        container.pack(fill="both", expand=True, padx=40, pady=(0, 40))
+                                  border_color=PALETTE["border"], border_width=1,
+                                  corner_radius=12)
+        container.pack(fill="x", padx=40, pady=(0, 20))
 
-        ctk.CTkLabel(container, text="Appearance Mode",
+        # ── Theme selector ────────────────────────────────────────────────
+        self._section(container, "APPEARANCE", first=True)
+
+        theme_row = ctk.CTkFrame(container, fg_color="transparent")
+        theme_row.pack(fill="x", padx=30, pady=(0, 8))
+
+        ctk.CTkLabel(theme_row, text="Colour Theme",
                      font=("Georgia", 14, "bold"),
-                     text_color=PALETTE["text_primary"]).pack(anchor="w", padx=30, pady=(30, 10))
-        self.mode_switch = ctk.CTkOptionMenu(
-            container, values=["Dark", "Light"],
+                     text_color=PALETTE["text_primary"],
+                     anchor="w").pack(side="left", fill="x", expand=True)
+
+        self.theme_menu = ctk.CTkOptionMenu(
+            theme_row,
+            values=list(THEMES.keys()),
+            width=200, height=34, corner_radius=8,
             fg_color=PALETTE["surface_2"],
             button_color=PALETTE["accent"],
             button_hover_color=PALETTE["accent_dim"],
-            command=lambda m: ctk.set_appearance_mode(m)
+            dropdown_fg_color=PALETTE["surface_2"],
+            dropdown_text_color=PALETTE["text_primary"],
+            dropdown_hover_color=PALETTE["border"],
+            text_color=PALETTE["text_primary"],
+            font=("Courier New", 12),
+            command=self._on_theme_selected,
         )
-        self.mode_switch.pack(anchor="w", padx=30)
+        self.theme_menu.set(CURRENT_THEME[0])
+        self.theme_menu.pack(side="right")
 
-        ctk.CTkLabel(container, text="AI Core Engine",
-                     font=("Georgia", 14, "bold"),
-                     text_color=PALETTE["text_primary"]).pack(anchor="w", padx=30, pady=(30, 10))
         ctk.CTkLabel(
             container,
+            text="Changes take effect immediately across the entire application.",
+            font=("Courier New", 10),
+            text_color=PALETTE["text_dim"], anchor="w"
+        ).pack(fill="x", padx=30, pady=(0, 20))
+
+        # Theme preview swatches
+        swatch_frame = ctk.CTkFrame(container, fg_color="transparent")
+        swatch_frame.pack(fill="x", padx=30, pady=(0, 24))
+
+        self.swatches = {}
+        for i, (name, theme) in enumerate(THEMES.items()):
+            col = ctk.CTkFrame(swatch_frame, fg_color="transparent")
+            col.pack(side="left", padx=(0, 12))
+
+            swatch = ctk.CTkFrame(col, width=48, height=48, corner_radius=8,
+                                   fg_color=theme["bg"],
+                                   border_width=2,
+                                   border_color=theme["accent"])
+            swatch.pack()
+            swatch.pack_propagate(False)
+
+            # Accent dot inside
+            dot = ctk.CTkFrame(swatch, width=16, height=16, corner_radius=8,
+                                fg_color=theme["accent"])
+            dot.place(relx=0.5, rely=0.5, anchor="center")
+
+            ctk.CTkLabel(col, text=name.split(" ")[0],
+                         font=("Courier New", 9),
+                         text_color=PALETTE["text_dim"]).pack(pady=(4, 0))
+
+            self.swatches[name] = swatch
+
+            def _click(e, n=name):
+                self._on_theme_selected(n)
+                self.theme_menu.set(n)
+
+            swatch.bind("<Button-1>", _click)
+            dot.bind("<Button-1>", _click)
+
+        # ── Divider ───────────────────────────────────────────────────────
+        ctk.CTkFrame(container, height=1, fg_color=PALETTE["border"]).pack(
+            fill="x", padx=20, pady=(0, 20))
+
+        # ── AI section ────────────────────────────────────────────────────
+        self._section(container, "AI CORE ENGINE")
+
+        ai_row = ctk.CTkFrame(container, fg_color="transparent")
+        ai_row.pack(fill="x", padx=30, pady=(0, 24))
+
+        dot = ctk.CTkFrame(ai_row, width=10, height=10, corner_radius=5,
+                            fg_color=PALETTE["positive"])
+        dot.pack(side="left", padx=(0, 10))
+        dot.pack_propagate(False)
+
+        ctk.CTkLabel(
+            ai_row,
             text="Connected via OpenAI API (gpt-3.5-turbo-instruct)",
             text_color=PALETTE["positive"],
             font=("Courier New", 12)
-        ).pack(anchor="w", padx=30)
+        ).pack(side="left")
+
+    def _section(self, parent, label, first=False):
+        ctk.CTkLabel(
+            parent, text=label,
+            font=("Courier New", 9, "bold"),
+            text_color=PALETTE["text_dim"], anchor="w"
+        ).pack(fill="x", padx=30, pady=(24 if not first else 24, 10))
+
+    def _on_theme_selected(self, name):
+        self.on_theme_change(name)
+        # Highlight active swatch
+        for n, swatch in self.swatches.items():
+            swatch.configure(border_color=THEMES[n]["accent"],
+                             border_width=3 if n == name else 1)
 
 
 # ── Main Application ──────────────────────────────────────────────────────────
@@ -1894,12 +2083,18 @@ class SettingsPanel(ctk.CTkFrame):
 class ExecutiveInsight(ctk.CTk):
     def __init__(self):
         super().__init__()
-
         self.title("Executive Insight")
         self.geometry("1280x800")
         self.configure(fg_color=PALETTE["bg"])
-
         self.engine = LegalEngine()
+        self._build_ui()
+        self._show_panel("Dashboard")
+
+    # ── Build all UI from current PALETTE ─────────────────────────────────────
+    def _build_ui(self):
+        # Destroy any previous body if rebuilding
+        for w in self.winfo_children():
+            w.destroy()
 
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True)
@@ -1907,8 +2102,8 @@ class ExecutiveInsight(ctk.CTk):
         self.sidebar = Sidebar(body, on_select=self._show_panel)
         self.sidebar.pack(side="left", fill="y")
 
-        ctk.CTkFrame(body, width=1, fg_color=PALETTE["border"],
-                     corner_radius=0).pack(side="left", fill="y")
+        self._divider = ctk.CTkFrame(body, width=1, fg_color=PALETTE["border"], corner_radius=0)
+        self._divider.pack(side="left", fill="y")
 
         self.content_area = ctk.CTkFrame(body, fg_color=PALETTE["bg"], corner_radius=0)
         self.content_area.pack(side="left", fill="both", expand=True)
@@ -1920,16 +2115,37 @@ class ExecutiveInsight(ctk.CTk):
             "Party Impact": PartyImpactPanel(self.content_area),
             "US Wars":      USWarsPanel(self.content_area),
             "Gov. History": GovHistoryPanel(self.content_area),
-            "Settings":     SettingsPanel(self.content_area),
+            "Settings":     SettingsPanel(self.content_area, on_theme_change=self._apply_theme),
         }
 
-        self._show_panel("Dashboard")
+    # ── Theme application ──────────────────────────────────────────────────────
+    def _apply_theme(self, theme_name):
+        if theme_name not in THEMES:
+            return
 
+        # Update global palette in-place so all future widget refs use new colours
+        PALETTE.update(THEMES[theme_name])
+        CURRENT_THEME[0] = theme_name
+
+        # Switch CTk light/dark mode if needed
+        ctk.set_appearance_mode(PALETTE["ctk_mode"])
+
+        # Update root window background
+        self.configure(fg_color=PALETTE["bg"])
+
+        # Rebuild the entire UI with the new palette
+        self._build_ui()
+        self._show_panel("Settings")
+
+    # ── Panel switching ────────────────────────────────────────────────────────
     def _show_panel(self, name):
         for panel in self.panels.values():
             panel.pack_forget()
         if name in self.panels:
             self.panels[name].pack(fill="both", expand=True)
+        # Keep sidebar active state in sync
+        if hasattr(self, "sidebar"):
+            self.sidebar.set_active(name)
 
 
 if __name__ == "__main__":
