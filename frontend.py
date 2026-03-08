@@ -354,6 +354,9 @@ class Sidebar(ctk.CTkFrame):
         self.btn_wars  = SidebarButton(self, "  US Wars",        lambda: on_select("US Wars"))
         self.btn_wars.pack(fill="x", padx=10, pady=3)
 
+        self.btn_gov   = SidebarButton(self, "  Gov. History",   lambda: on_select("Gov. History"))
+        self.btn_gov.pack(fill="x", padx=10, pady=3)
+
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.pack(side="bottom", fill="x", padx=10, pady=20)
         ctk.CTkFrame(footer, height=1, fg_color=PALETTE["border"]).pack(fill="x", pady=(0, 10))
@@ -958,6 +961,900 @@ class USWarsPanel(ctk.CTkFrame):
                 card.pack_forget()
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  GOVERNMENT HISTORY DATA
+# ══════════════════════════════════════════════════════════════════════════════
+
+GOV_ERAS = [
+    {
+        "era":     "Founding & Federalist Era",
+        "years":   "1789 – 1801",
+        "color":   "#C9A84C",
+        "summary": (
+            "The United States government was established under the new Constitution. "
+            "The first two presidents were unaffiliated with formal parties, though "
+            "deep ideological splits between Federalists and Democratic-Republicans "
+            "rapidly formed around figures like Hamilton and Jefferson."
+        ),
+        "presidents": [
+            {
+                "number": 1, "name": "George Washington", "party": "Unaffiliated",
+                "years": "1789–1797", "vp": "John Adams",
+                "key_facts": [
+                    "First president; set two-term precedent voluntarily.",
+                    "Signed the Judiciary Act (1789), creating the federal court system.",
+                    "Suppressed the Whiskey Rebellion (1794), asserting federal authority.",
+                    "Issued Proclamation of Neutrality (1793) keeping US out of European wars.",
+                    "Warned against political parties and foreign alliances in Farewell Address.",
+                ],
+            },
+            {
+                "number": 2, "name": "John Adams", "party": "Federalist",
+                "years": "1797–1801", "vp": "Thomas Jefferson",
+                "key_facts": [
+                    "Avoided full-scale war with France during the Quasi-War (1798–1800).",
+                    "Signed the controversial Alien and Sedition Acts (1798).",
+                    "First president to live in the White House (moved in 1800).",
+                    "Lost re-election to Thomas Jefferson in the first peaceful transfer of power.",
+                ],
+            },
+        ],
+    },
+    {
+        "era":     "Democratic-Republican Dominance",
+        "years":   "1801 – 1825",
+        "color":   "#4A90D9",
+        "summary": (
+            "The Federalist Party collapsed and the Democratic-Republicans dominated "
+            "unchallenged. This 'Era of Good Feelings' saw westward expansion, the "
+            "Louisiana Purchase, the War of 1812, and the beginnings of American "
+            "industrial and territorial growth."
+        ),
+        "presidents": [
+            {
+                "number": 3, "name": "Thomas Jefferson", "party": "Democratic-Republican",
+                "years": "1801–1809", "vp": "Aaron Burr / George Clinton",
+                "key_facts": [
+                    "Louisiana Purchase (1803) doubled the size of the US for ~$15 million.",
+                    "Commissioned the Lewis & Clark Expedition (1804–1806).",
+                    "Signed the Act Prohibiting Importation of Slaves (1807).",
+                    "Imposed the Embargo Act (1807) to avoid European wars — economically disastrous.",
+                ],
+            },
+            {
+                "number": 4, "name": "James Madison", "party": "Democratic-Republican",
+                "years": "1809–1817", "vp": "George Clinton / Elbridge Gerry",
+                "key_facts": [
+                    "Led the US through the War of 1812 against Britain.",
+                    "The White House and Capitol were burned by British forces in 1814.",
+                    "Treaty of Ghent (1814) ended the War of 1812 with status quo ante bellum.",
+                    "Known as 'Father of the Constitution' for his role at the Constitutional Convention.",
+                ],
+            },
+            {
+                "number": 5, "name": "James Monroe", "party": "Democratic-Republican",
+                "years": "1817–1825", "vp": "Daniel D. Tompkins",
+                "key_facts": [
+                    "Issued the Monroe Doctrine (1823) — warning Europe against re-colonising the Americas.",
+                    "Missouri Compromise (1820) temporarily resolved slavery expansion tensions.",
+                    "Acquired Florida from Spain via the Adams-Onís Treaty (1819).",
+                    "Re-elected with virtually no opposition in 1820 — height of the 'Era of Good Feelings'.",
+                ],
+            },
+        ],
+    },
+    {
+        "era":     "Jacksonian Democracy & Expansion",
+        "years":   "1825 – 1849",
+        "color":   "#D94A4A",
+        "summary": (
+            "A new populist politics emerged under Andrew Jackson, expanding voting rights "
+            "to white men without property. This era saw the forced removal of Native "
+            "Americans, the rise of the Whig Party, and major territorial expansion "
+            "through the Mexican-American War."
+        ),
+        "presidents": [
+            {
+                "number": 6, "name": "John Quincy Adams", "party": "Democratic-Republican / National Republican",
+                "years": "1825–1829", "vp": "John C. Calhoun",
+                "key_facts": [
+                    "Won presidency in the 'Corrupt Bargain' — no candidate won an Electoral majority.",
+                    "Advocated for national infrastructure, education, and science funding.",
+                    "Heavily opposed by Jacksonians; later served in Congress as a strong anti-slavery voice.",
+                ],
+            },
+            {
+                "number": 7, "name": "Andrew Jackson", "party": "Democrat",
+                "years": "1829–1837", "vp": "John C. Calhoun / Martin Van Buren",
+                "key_facts": [
+                    "Indian Removal Act (1830) — forced relocation of 60,000+ Native Americans; Trail of Tears.",
+                    "Vetoed renewal of the Second Bank of the United States, destroying it.",
+                    "Survived the first assassination attempt on a US president (1835).",
+                    "Nullification Crisis — threatened military force to prevent South Carolina secession.",
+                ],
+            },
+            {
+                "number": 8, "name": "Martin Van Buren", "party": "Democrat",
+                "years": "1837–1841", "vp": "Richard Mentor Johnson",
+                "key_facts": [
+                    "Faced the Panic of 1837, one of the worst economic depressions to that point.",
+                    "Established the Independent Treasury System.",
+                    "Continued forced Native American removal policies.",
+                ],
+            },
+            {
+                "number": 9, "name": "William Henry Harrison", "party": "Whig",
+                "years": "1841", "vp": "John Tyler",
+                "key_facts": [
+                    "Shortest presidency in US history — died of pneumonia 31 days after inauguration.",
+                    "Delivered the longest inaugural address in history (1 hour 45 minutes) in cold rain.",
+                ],
+            },
+            {
+                "number": 10, "name": "John Tyler", "party": "Whig (expelled)",
+                "years": "1841–1845", "vp": "None",
+                "key_facts": [
+                    "First VP to assume presidency due to death of predecessor.",
+                    "Expelled from the Whig Party; served as president with no party affiliation.",
+                    "Annexed Texas in his final days in office (1845).",
+                ],
+            },
+            {
+                "number": 11, "name": "James K. Polk", "party": "Democrat",
+                "years": "1845–1849", "vp": "George M. Dallas",
+                "key_facts": [
+                    "Oversaw the greatest territorial expansion in US history — Oregon, California, the Southwest.",
+                    "Mexican-American War (1846–1848) added 525,000 sq miles to the US.",
+                    "Served one term by choice; fulfilled every major campaign promise.",
+                ],
+            },
+        ],
+    },
+    {
+        "era":     "Slavery Crisis & Civil War",
+        "years":   "1849 – 1869",
+        "color":   "#8A6E2F",
+        "summary": (
+            "The nation fractured over slavery. The new Republican Party rose on an "
+            "anti-slavery platform. Abraham Lincoln's election triggered Southern secession "
+            "and the bloodiest conflict in American history. The Union was preserved and "
+            "slavery abolished, but Reconstruction began amid deep national wounds."
+        ),
+        "presidents": [
+            {
+                "number": 12, "name": "Zachary Taylor", "party": "Whig",
+                "years": "1849–1850", "vp": "Millard Fillmore",
+                "key_facts": [
+                    "Died in office July 1850, possibly from gastroenteritis.",
+                    "War hero of Mexican-American War; resisted extreme pro-slavery demands.",
+                ],
+            },
+            {
+                "number": 13, "name": "Millard Fillmore", "party": "Whig",
+                "years": "1850–1853", "vp": "None",
+                "key_facts": [
+                    "Signed the Compromise of 1850, temporarily defusing the slavery crisis.",
+                    "Signed the Fugitive Slave Act, deeply angering Northern abolitionists.",
+                    "Last Whig president; party collapsed shortly after.",
+                ],
+            },
+            {
+                "number": 14, "name": "Franklin Pierce", "party": "Democrat",
+                "years": "1853–1857", "vp": "William Rufus DeVane King",
+                "key_facts": [
+                    "Kansas-Nebraska Act (1854) reopened slavery debate; triggered 'Bleeding Kansas' violence.",
+                    "His pro-Southern stance alienated the North and accelerated sectional crisis.",
+                ],
+            },
+            {
+                "number": 15, "name": "James Buchanan", "party": "Democrat",
+                "years": "1857–1861", "vp": "John C. Breckinridge",
+                "key_facts": [
+                    "Widely considered one of the worst presidents for failing to prevent secession.",
+                    "Dred Scott decision (1857) — Supreme Court ruled enslaved people had no rights.",
+                    "Seven states seceded before he left office; he took no action to stop them.",
+                ],
+            },
+            {
+                "number": 16, "name": "Abraham Lincoln", "party": "Republican",
+                "years": "1861–1865", "vp": "Hannibal Hamlin / Andrew Johnson",
+                "key_facts": [
+                    "Led the Union through the Civil War (1861–1865); ~620,000 soldiers died.",
+                    "Emancipation Proclamation (1863) freed enslaved people in Confederate states.",
+                    "Gettysburg Address (1863) redefined the war as a fight for human equality.",
+                    "13th Amendment (1865) abolished slavery nationwide.",
+                    "Assassinated by John Wilkes Booth on April 14, 1865 — 5 days after Confederate surrender.",
+                ],
+            },
+            {
+                "number": 17, "name": "Andrew Johnson", "party": "Democrat (National Union ticket)",
+                "years": "1865–1869", "vp": "None",
+                "key_facts": [
+                    "Clashed bitterly with Radical Republicans over Reconstruction policy.",
+                    "First president impeached by the House (1868); acquitted by the Senate by one vote.",
+                    "Purchased Alaska from Russia for $7.2 million (1867).",
+                    "Vetoed the Civil Rights Act of 1866; Congress overrode the veto.",
+                ],
+            },
+        ],
+    },
+    {
+        "era":     "Reconstruction & Gilded Age",
+        "years":   "1869 – 1901",
+        "color":   "#3A6EA8",
+        "summary": (
+            "Reconstruction attempted to integrate freed Black Americans into civic life, "
+            "but was undermined by Southern resistance and Northern fatigue. The Gilded Age "
+            "saw explosive industrialisation, the rise of robber barons, massive immigration, "
+            "and growing calls for reform."
+        ),
+        "presidents": [
+            {
+                "number": 18, "name": "Ulysses S. Grant", "party": "Republican",
+                "years": "1869–1877", "vp": "Schuyler Colfax / Henry Wilson",
+                "key_facts": [
+                    "Led Reconstruction-era federal enforcement against the KKK.",
+                    "His administration was marred by the Crédit Mobilier and Whiskey Ring scandals.",
+                    "15th Amendment ratified (1870) — gave Black men the right to vote.",
+                ],
+            },
+            {
+                "number": 19, "name": "Rutherford B. Hayes", "party": "Republican",
+                "years": "1877–1881", "vp": "William A. Wheeler",
+                "key_facts": [
+                    "Won the disputed 1876 election via the Compromise of 1877.",
+                    "Effectively ended Reconstruction by withdrawing federal troops from the South.",
+                ],
+            },
+            {
+                "number": 20, "name": "James A. Garfield", "party": "Republican",
+                "years": "1881", "vp": "Chester A. Arthur",
+                "key_facts": [
+                    "Shot by a disappointed office-seeker July 2, 1881; died September 19.",
+                    "His assassination galvanised civil service reform.",
+                ],
+            },
+            {
+                "number": 21, "name": "Chester A. Arthur", "party": "Republican",
+                "years": "1881–1885", "vp": "None",
+                "key_facts": [
+                    "Signed the Pendleton Civil Service Reform Act (1883) — merit-based federal jobs.",
+                    "Signed the Chinese Exclusion Act (1882), barring Chinese immigration for 10 years.",
+                ],
+            },
+            {
+                "number": 22, "name": "Grover Cleveland", "party": "Democrat",
+                "years": "1885–1889", "vp": "Thomas A. Hendricks",
+                "key_facts": [
+                    "Only president to serve non-consecutive terms (22nd and 24th).",
+                    "Vetoed hundreds of spending bills; known for fiscal conservatism.",
+                    "First Democrat elected president since before the Civil War.",
+                ],
+            },
+            {
+                "number": 23, "name": "Benjamin Harrison", "party": "Republican",
+                "years": "1889–1893", "vp": "Levi P. Morton",
+                "key_facts": [
+                    "Six states admitted to the Union during his term.",
+                    "Sherman Antitrust Act (1890) — first federal law targeting monopolies.",
+                    "Lost re-election to Grover Cleveland despite winning more electoral votes in 1888.",
+                ],
+            },
+            {
+                "number": 24, "name": "Grover Cleveland", "party": "Democrat",
+                "years": "1893–1897", "vp": "Adlai Stevenson I",
+                "key_facts": [
+                    "Second non-consecutive term; faced the severe Panic of 1893.",
+                    "Sent federal troops to break the Pullman Strike (1894).",
+                ],
+            },
+            {
+                "number": 25, "name": "William McKinley", "party": "Republican",
+                "years": "1897–1901", "vp": "Garret Hobart / Theodore Roosevelt",
+                "key_facts": [
+                    "Spanish-American War (1898) — US acquired Puerto Rico, Guam, and the Philippines.",
+                    "Presided over the annexation of Hawaii (1898).",
+                    "Assassinated September 14, 1901 by anarchist Leon Czolgosz.",
+                ],
+            },
+        ],
+    },
+    {
+        "era":     "Progressive Era & World Power",
+        "years":   "1901 – 1933",
+        "color":   "#3DAA72",
+        "summary": (
+            "Reformers challenged industrial inequality, corruption, and monopoly power. "
+            "The US emerged as a genuine world power, entered WWI, rejected the League "
+            "of Nations, enjoyed the Roaring Twenties, and then collapsed into the "
+            "Great Depression."
+        ),
+        "presidents": [
+            {
+                "number": 26, "name": "Theodore Roosevelt", "party": "Republican",
+                "years": "1901–1909", "vp": "Charles W. Fairbanks",
+                "key_facts": [
+                    "Youngest president at 42; trust-buster who filed 44 antitrust suits.",
+                    "Pure Food and Drug Act & Meat Inspection Act (1906) — consumer protections.",
+                    "Won Nobel Peace Prize for mediating the Russo-Japanese War (1905).",
+                    "Conservation — created 150 national forests and 5 national parks.",
+                ],
+            },
+            {
+                "number": 27, "name": "William Howard Taft", "party": "Republican",
+                "years": "1909–1913", "vp": "James S. Sherman",
+                "key_facts": [
+                    "Filed more antitrust suits than Roosevelt despite being seen as less progressive.",
+                    "16th Amendment (1913) — federal income tax authorised.",
+                    "17th Amendment (1913) — direct election of US senators.",
+                ],
+            },
+            {
+                "number": 28, "name": "Woodrow Wilson", "party": "Democrat",
+                "years": "1913–1921", "vp": "Thomas R. Marshall",
+                "key_facts": [
+                    "Led the US into WWI (1917); his Fourteen Points shaped the Paris Peace Conference.",
+                    "Federal Reserve Act (1913) — created the central banking system.",
+                    "League of Nations proposed by Wilson; rejected by the US Senate.",
+                    "18th Amendment (Prohibition) and 19th Amendment (women's suffrage) ratified.",
+                    "Suffered a severe stroke in 1919; his wife Edith effectively ran the presidency.",
+                ],
+            },
+            {
+                "number": 29, "name": "Warren G. Harding", "party": "Republican",
+                "years": "1921–1923", "vp": "Calvin Coolidge",
+                "key_facts": [
+                    "Died in office August 2, 1923, likely from a heart attack.",
+                    "Teapot Dome Scandal — administration rocked by corruption in oil leases.",
+                    "Called for a 'return to normalcy' after WWI.",
+                ],
+            },
+            {
+                "number": 30, "name": "Calvin Coolidge", "party": "Republican",
+                "years": "1923–1929", "vp": "Charles G. Dawes",
+                "key_facts": [
+                    "Presided over the economic boom of the 'Roaring Twenties'.",
+                    "Known for minimal government intervention and fiscal restraint.",
+                    "Declined to seek re-election in 1928.",
+                ],
+            },
+            {
+                "number": 31, "name": "Herbert Hoover", "party": "Republican",
+                "years": "1929–1933", "vp": "Charles Curtis",
+                "key_facts": [
+                    "The Great Depression began with the stock market crash of October 1929.",
+                    "Smoot-Hawley Tariff (1930) deepened the global depression.",
+                    "Bonus Army — WWI veterans marching for benefits were dispersed by the military.",
+                ],
+            },
+        ],
+    },
+    {
+        "era":     "New Deal, WWII & Cold War Roots",
+        "years":   "1933 – 1961",
+        "color":   "#C9A84C",
+        "summary": (
+            "FDR transformed the federal government's role through the New Deal. "
+            "The US led the Allied victory in WWII and emerged as a global superpower. "
+            "The Cold War with the Soviet Union defined foreign policy and domestic life "
+            "through McCarthyism and the nuclear arms race."
+        ),
+        "presidents": [
+            {
+                "number": 32, "name": "Franklin D. Roosevelt", "party": "Democrat",
+                "years": "1933–1945", "vp": "Garner / Wallace / Truman",
+                "key_facts": [
+                    "Only president elected to four terms; served longer than any other.",
+                    "New Deal programs (1933–39) — Social Security, SEC, FDIC, unemployment insurance.",
+                    "Led the US through WWII; died April 12, 1945, just before Allied victory.",
+                    "Executive Order 9066 — interned 120,000 Japanese Americans.",
+                ],
+            },
+            {
+                "number": 33, "name": "Harry S. Truman", "party": "Democrat",
+                "years": "1945–1953", "vp": "Alben Barkley",
+                "key_facts": [
+                    "Authorised atomic bombings of Hiroshima and Nagasaki (August 1945).",
+                    "Marshall Plan (1948) — $13B to rebuild war-torn Europe.",
+                    "NATO founded (1949); Korean War (1950); desegregated the military (1948).",
+                    "Truman Doctrine (1947) — US would support nations resisting communism.",
+                ],
+            },
+            {
+                "number": 34, "name": "Dwight D. Eisenhower", "party": "Republican",
+                "years": "1953–1961", "vp": "Richard Nixon",
+                "key_facts": [
+                    "Interstate Highway System authorised (1956) — transformed American infrastructure.",
+                    "Warned of the 'military-industrial complex' in his Farewell Address.",
+                    "Sent federal troops to enforce school desegregation in Little Rock (1957).",
+                    "NASA created (1958) in response to Soviet Sputnik launch.",
+                ],
+            },
+        ],
+    },
+    {
+        "era":     "Civil Rights, Vietnam & the Cultural Revolution",
+        "years":   "1961 – 1981",
+        "color":   "#4A90D9",
+        "summary": (
+            "America was torn apart and remade. JFK's assassination, the Civil Rights "
+            "movement, Vietnam, Nixon's Watergate, and the energy crisis defined a "
+            "generation. The era ended with a deep national crisis of confidence."
+        ),
+        "presidents": [
+            {
+                "number": 35, "name": "John F. Kennedy", "party": "Democrat",
+                "years": "1961–1963", "vp": "Lyndon B. Johnson",
+                "key_facts": [
+                    "Youngest elected president; first Catholic president.",
+                    "Cuban Missile Crisis (1962) — brought the world to the brink of nuclear war.",
+                    "Peace Corps founded (1961); Apollo programme launched.",
+                    "Assassinated in Dallas on November 22, 1963.",
+                ],
+            },
+            {
+                "number": 36, "name": "Lyndon B. Johnson", "party": "Democrat",
+                "years": "1963–1969", "vp": "Hubert Humphrey",
+                "key_facts": [
+                    "Civil Rights Act (1964) and Voting Rights Act (1965) — landmark racial equality legislation.",
+                    "Great Society programmes — Medicare, Medicaid, federal education funding.",
+                    "Escalated Vietnam War to 500,000+ US troops; domestically devastating.",
+                    "Declined to run for re-election amid anti-war protests.",
+                ],
+            },
+            {
+                "number": 37, "name": "Richard Nixon", "party": "Republican",
+                "years": "1969–1974", "vp": "Agnew / Ford",
+                "key_facts": [
+                    "First president to resign; Watergate scandal (1972–74).",
+                    "Opened diplomatic relations with China (1972).",
+                    "Ended US involvement in Vietnam (1973 Paris Peace Accords).",
+                    "EPA and OSHA created; Clean Air Act signed.",
+                ],
+            },
+            {
+                "number": 38, "name": "Gerald Ford", "party": "Republican",
+                "years": "1974–1977", "vp": "Nelson Rockefeller",
+                "key_facts": [
+                    "Only president never elected as president or VP.",
+                    "Pardoned Nixon — deeply unpopular; likely cost him the 1976 election.",
+                    "Fall of Saigon (1975) — end of the Vietnam War.",
+                ],
+            },
+            {
+                "number": 39, "name": "Jimmy Carter", "party": "Democrat",
+                "years": "1977–1981", "vp": "Walter Mondale",
+                "key_facts": [
+                    "Camp David Accords (1978) — brokered peace between Egypt and Israel.",
+                    "Iran Hostage Crisis (1979–81) — 52 Americans held for 444 days.",
+                    "Energy crisis and stagflation; Department of Energy created.",
+                    "Later awarded the Nobel Peace Prize (2002) for post-presidential humanitarian work.",
+                ],
+            },
+        ],
+    },
+    {
+        "era":     "Reagan Revolution to the 21st Century",
+        "years":   "1981 – 2001",
+        "color":   "#D94A4A",
+        "summary": (
+            "Ronald Reagan reshaped American conservatism and accelerated the end of the "
+            "Cold War. The Soviet Union dissolved in 1991. The 1990s brought economic "
+            "prosperity, budget surpluses, and the dawn of the internet age, ending "
+            "with the contested 2000 election."
+        ),
+        "presidents": [
+            {
+                "number": 40, "name": "Ronald Reagan", "party": "Republican",
+                "years": "1981–1989", "vp": "George H. W. Bush",
+                "key_facts": [
+                    "Reaganomics — major tax cuts, deregulation, defence spending increases.",
+                    "Iran-Contra Affair — secret arms sales to Iran to fund Nicaraguan rebels.",
+                    "Challenged Soviet Union with military buildup and Strategic Defence Initiative.",
+                    "Survived assassination attempt (March 30, 1981).",
+                    "The Cold War effectively ended under his presidency.",
+                ],
+            },
+            {
+                "number": 41, "name": "George H. W. Bush", "party": "Republican",
+                "years": "1989–1993", "vp": "Dan Quayle",
+                "key_facts": [
+                    "Led the Gulf War coalition (1991) to liberate Kuwait.",
+                    "Oversaw the peaceful dissolution of the Soviet Union (1991).",
+                    "Americans with Disabilities Act (1990) signed.",
+                    "Broke 'no new taxes' pledge; lost re-election to Clinton.",
+                ],
+            },
+            {
+                "number": 42, "name": "Bill Clinton", "party": "Democrat",
+                "years": "1993–2001", "vp": "Al Gore",
+                "key_facts": [
+                    "Longest economic expansion in US history; first budget surpluses since 1969.",
+                    "NAFTA (1994); Family and Medical Leave Act; Brady Bill gun controls.",
+                    "Impeached by House over the Lewinsky scandal (1998); acquitted by Senate.",
+                    "NATO intervention in Kosovo; bombed Iraq over weapons inspections.",
+                ],
+            },
+        ],
+    },
+    {
+        "era":     "Post-9/11, Financial Crisis & Obama Years",
+        "years":   "2001 – 2017",
+        "color":   "#3A6EA8",
+        "summary": (
+            "The September 11 attacks redefined American foreign and domestic policy. "
+            "Two costly wars followed. The 2008 financial crisis was the worst since "
+            "the Great Depression. Barack Obama became the first Black president, "
+            "passed landmark healthcare reform, and wound down the Iraq War."
+        ),
+        "presidents": [
+            {
+                "number": 43, "name": "George W. Bush", "party": "Republican",
+                "years": "2001–2009", "vp": "Dick Cheney",
+                "key_facts": [
+                    "9/11 attacks (2001) — launched wars in Afghanistan and Iraq.",
+                    "PATRIOT Act and creation of DHS transformed domestic security.",
+                    "Iraq War (2003) based on faulty WMD intelligence; no weapons found.",
+                    "2008 financial crisis — $700B TARP bank bailout signed.",
+                    "Medicare Part D prescription drug benefit added.",
+                ],
+            },
+            {
+                "number": 44, "name": "Barack Obama", "party": "Democrat",
+                "years": "2009–2017", "vp": "Joe Biden",
+                "key_facts": [
+                    "First African-American president; won Nobel Peace Prize 2009.",
+                    "Affordable Care Act (2010) — largest healthcare reform since Medicare.",
+                    "Ordered the mission that killed Osama bin Laden (May 2011).",
+                    "Dodd-Frank financial reform; Recovery Act stimulus ($787B).",
+                    "Legalisation of same-sex marriage nationwide (Obergefell v. Hodges, 2015).",
+                ],
+            },
+        ],
+    },
+    {
+        "era":     "Populist Era & Political Polarisation",
+        "years":   "2017 – Present",
+        "color":   "#C95C4C",
+        "summary": (
+            "Donald Trump's first term upended political norms, trade policy, and "
+            "alliances. Joe Biden oversaw post-COVID recovery and record inflation. "
+            "Trump's 2024 landslide return to power — the first convicted felon elected "
+            "president — ushered in aggressive executive action including military "
+            "strikes on Iran in early 2026."
+        ),
+        "presidents": [
+            {
+                "number": 45, "name": "Donald J. Trump (1st term)", "party": "Republican",
+                "years": "2017–2021", "vp": "Mike Pence",
+                "key_facts": [
+                    "Tax Cuts and Jobs Act (2017) — largest corporate tax cut in US history.",
+                    "Withdrew from the Paris Climate Agreement and Trans-Pacific Partnership.",
+                    "Abraham Accords (2020) — normalised Israel-Arab relations.",
+                    "COVID-19 pandemic; Operation Warp Speed delivered vaccines in record time.",
+                    "Impeached twice (2019 and 2021); acquitted both times by the Senate.",
+                    "January 6, 2021 Capitol riot followed his election loss to Biden.",
+                ],
+            },
+            {
+                "number": 46, "name": "Joe Biden", "party": "Democrat",
+                "years": "2021–2025", "vp": "Kamala Harris",
+                "key_facts": [
+                    "Infrastructure Investment and Jobs Act (2021) — $1.2 trillion.",
+                    "Inflation Reduction Act (2022) — $369B in climate spending.",
+                    "US withdrawal from Afghanistan (August 2021).",
+                    "Record inflation peaking at 9.1% (June 2022).",
+                    "Oldest president in US history; declined to seek re-election July 2024.",
+                ],
+            },
+            {
+                "number": 47, "name": "Donald J. Trump (2nd term)", "party": "Republican",
+                "years": "2025–Present", "vp": "JD Vance",
+                "key_facts": [
+                    "First president convicted of felony crimes (34 counts) before taking office.",
+                    "Launched sweeping tariffs on imports, triggering global trade tensions.",
+                    "Ordered Operation Epic Fury airstrikes on Iran (February 28, 2026) with Israel.",
+                    "Rapid executive order campaign targeting immigration, DEI, and federal workforce.",
+                    "DOGE — Department of Government Efficiency created under Elon Musk to cut federal spending.",
+                ],
+            },
+        ],
+    },
+]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  GOVERNMENT HISTORY PANEL
+# ══════════════════════════════════════════════════════════════════════════════
+
+class PresidentCard(ctk.CTkFrame):
+    """Compact card for a single president, expandable for key facts."""
+
+    def __init__(self, master, pres, era_color, **kwargs):
+        super().__init__(
+            master,
+            fg_color=PALETTE["bg"],
+            corner_radius=8,
+            border_width=1,
+            border_color=PALETTE["border"],
+            **kwargs
+        )
+        self.pres      = pres
+        self.era_color = era_color
+        self._expanded = False
+        self._build()
+
+    def _build(self):
+        hdr = ctk.CTkFrame(self, fg_color="transparent", cursor="hand2")
+        hdr.pack(fill="x", padx=14, pady=10)
+
+        # Number circle
+        num_frame = ctk.CTkFrame(hdr, width=36, height=36, corner_radius=18,
+                                  fg_color=PALETTE["surface_2"],
+                                  border_width=1, border_color=self.era_color)
+        num_frame.pack(side="left", padx=(0, 12))
+        num_frame.pack_propagate(False)
+        ctk.CTkLabel(
+            num_frame, text=str(self.pres["number"]),
+            font=("Courier New", 10, "bold"),
+            text_color=self.era_color
+        ).place(relx=0.5, rely=0.5, anchor="center")
+
+        # Name & meta
+        info = ctk.CTkFrame(hdr, fg_color="transparent")
+        info.pack(side="left", fill="x", expand=True)
+
+        ctk.CTkLabel(
+            info, text=self.pres["name"],
+            font=("Georgia", 13, "bold"),
+            text_color=PALETTE["text_primary"], anchor="w"
+        ).pack(fill="x")
+
+        meta_row = ctk.CTkFrame(info, fg_color="transparent")
+        meta_row.pack(fill="x")
+
+        ctk.CTkLabel(
+            meta_row, text=self.pres["years"],
+            font=("Courier New", 10),
+            text_color=PALETTE["text_secondary"], anchor="w"
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            meta_row, text="  |  ",
+            font=("Courier New", 10),
+            text_color=PALETTE["text_dim"]
+        ).pack(side="left")
+
+        party_color = (PALETTE["dem_light"] if "Democrat" in self.pres["party"]
+                       else PALETTE["rep_light"] if "Republican" in self.pres["party"]
+                       else PALETTE["text_secondary"])
+        ctk.CTkLabel(
+            meta_row, text=self.pres["party"],
+            font=("Courier New", 10),
+            text_color=party_color, anchor="w"
+        ).pack(side="left")
+
+        self.toggle_btn = ctk.CTkButton(
+            hdr, text="▼", width=30, height=24,
+            corner_radius=4,
+            fg_color=PALETTE["surface_2"],
+            hover_color=PALETTE["border"],
+            text_color=PALETTE["text_secondary"],
+            font=("Courier New", 10, "bold"),
+            command=self._toggle
+        )
+        self.toggle_btn.pack(side="right")
+
+        self.facts_frame = ctk.CTkFrame(self, fg_color="transparent")
+        # hidden until expanded
+
+        for fact in self.pres["key_facts"]:
+            row = ctk.CTkFrame(self.facts_frame, fg_color="transparent")
+            row.pack(fill="x", padx=62, pady=2)
+
+            dot = ctk.CTkFrame(row, width=5, height=5, corner_radius=3,
+                               fg_color=self.era_color)
+            dot.pack(side="left", padx=(0, 8))
+            dot.pack_propagate(False)
+
+            ctk.CTkLabel(
+                row, text=fact,
+                font=("Courier New", 10),
+                text_color=PALETTE["text_secondary"],
+                wraplength=750, justify="left", anchor="w"
+            ).pack(side="left", fill="x", expand=True)
+
+        ctk.CTkFrame(self.facts_frame, height=8, fg_color="transparent").pack()
+
+        for w in (hdr, info, meta_row):
+            w.bind("<Button-1>", lambda e: self._toggle())
+
+    def _toggle(self):
+        self._expanded = not self._expanded
+        if self._expanded:
+            self.facts_frame.pack(fill="x")
+            self.toggle_btn.configure(text="▲")
+        else:
+            self.facts_frame.pack_forget()
+            self.toggle_btn.configure(text="▼")
+
+
+class EraSection(ctk.CTkFrame):
+    """Collapsible section for one historical era containing president cards."""
+
+    def __init__(self, master, era_data, **kwargs):
+        super().__init__(master, fg_color=PALETTE["surface"],
+                         border_width=1, border_color=era_data["color"],
+                         corner_radius=10, **kwargs)
+        self.era_data  = era_data
+        self._expanded = False
+        self._build_header()
+        self._build_body()
+
+    def _build_header(self):
+        # Left stripe
+        stripe = ctk.CTkFrame(self, width=4, fg_color=self.era_data["color"], corner_radius=0)
+        stripe.place(x=0, y=0, relheight=1)
+
+        hdr = ctk.CTkFrame(self, fg_color="transparent", cursor="hand2")
+        hdr.pack(fill="x", padx=20, pady=14)
+
+        left = ctk.CTkFrame(hdr, fg_color="transparent")
+        left.pack(side="left", fill="x", expand=True)
+
+        top = ctk.CTkFrame(left, fg_color="transparent")
+        top.pack(fill="x")
+
+        ctk.CTkLabel(
+            top, text=self.era_data["era"],
+            font=("Georgia", 15, "bold"),
+            text_color=self.era_data["color"], anchor="w"
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            top, text=f"   {self.era_data['years']}",
+            font=("Courier New", 10),
+            text_color=PALETTE["text_secondary"], anchor="w"
+        ).pack(side="left")
+
+        pres_count = len(self.era_data["presidents"])
+        ctk.CTkLabel(
+            left,
+            text=f"{pres_count} President{'s' if pres_count != 1 else ''} — click to expand",
+            font=("Courier New", 10),
+            text_color=PALETTE["text_dim"], anchor="w"
+        ).pack(fill="x")
+
+        self.toggle_btn = ctk.CTkButton(
+            hdr, text="▼  Expand", width=110, height=28,
+            corner_radius=6,
+            fg_color=PALETTE["surface_2"],
+            hover_color=PALETTE["border"],
+            text_color=PALETTE["text_secondary"],
+            font=("Courier New", 10, "bold"),
+            command=self._toggle
+        )
+        self.toggle_btn.pack(side="right")
+
+        for w in (hdr, left, top):
+            w.bind("<Button-1>", lambda e: self._toggle())
+
+    def _build_body(self):
+        self.body = ctk.CTkFrame(self, fg_color="transparent")
+
+        # Era summary
+        ctk.CTkLabel(
+            self.body,
+            text=self.era_data["summary"],
+            font=("Georgia", 12),
+            text_color=PALETTE["text_secondary"],
+            wraplength=860, justify="left", anchor="w"
+        ).pack(fill="x", padx=24, pady=(0, 12))
+
+        # President cards
+        for pres in self.era_data["presidents"]:
+            PresidentCard(self.body, pres, self.era_data["color"]).pack(
+                fill="x", padx=24, pady=(0, 8))
+
+        ctk.CTkFrame(self.body, height=12, fg_color="transparent").pack()
+
+    def _toggle(self):
+        self._expanded = not self._expanded
+        if self._expanded:
+            self.body.pack(fill="x", pady=(0, 12))
+            self.toggle_btn.configure(text="▲  Collapse")
+        else:
+            self.body.pack_forget()
+            self.toggle_btn.configure(text="▼  Expand")
+
+
+class GovHistoryPanel(ctk.CTkFrame):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, fg_color="transparent", **kwargs)
+        self._build()
+
+    def _build(self):
+        # Header
+        hdr = ctk.CTkFrame(self, fg_color="transparent")
+        hdr.pack(fill="x", padx=40, pady=(40, 4))
+
+        ctk.CTkLabel(
+            hdr, text="U.S. Government & Presidential History",
+            font=("Georgia", 24, "bold"),
+            text_color=PALETTE["text_primary"], anchor="w"
+        ).pack(side="left")
+
+        badge = ctk.CTkFrame(hdr, fg_color=PALETTE["surface_2"],
+                              corner_radius=4, border_width=1,
+                              border_color=PALETTE["border"])
+        badge.pack(side="right", pady=6)
+        total_presidents = sum(len(e["presidents"]) for e in GOV_ERAS)
+        ctk.CTkLabel(
+            badge, text=f"  {total_presidents} PRESIDENTS  •  {len(GOV_ERAS)} ERAS  ",
+            font=("Courier New", 9, "bold"),
+            text_color=PALETTE["text_dim"]
+        ).pack(pady=4)
+
+        ctk.CTkLabel(
+            self,
+            text="The progression of American leadership from 1789 to the present day.",
+            font=("Courier New", 11),
+            text_color=PALETTE["text_secondary"], anchor="w"
+        ).pack(fill="x", padx=40, pady=(0, 16))
+
+        # Expand / Collapse all controls
+        ctrl_row = ctk.CTkFrame(self, fg_color="transparent")
+        ctrl_row.pack(fill="x", padx=40, pady=(0, 12))
+
+        ctk.CTkLabel(
+            ctrl_row, text="QUICK ACTIONS:",
+            font=("Courier New", 9, "bold"),
+            text_color=PALETTE["text_dim"]
+        ).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            ctrl_row, text="Expand All", width=100, height=26,
+            corner_radius=6,
+            fg_color=PALETTE["surface_2"], hover_color=PALETTE["border"],
+            text_color=PALETTE["text_secondary"],
+            font=("Courier New", 10, "bold"),
+            command=self._expand_all
+        ).pack(side="left", padx=(0, 6))
+
+        ctk.CTkButton(
+            ctrl_row, text="Collapse All", width=100, height=26,
+            corner_radius=6,
+            fg_color=PALETTE["surface_2"], hover_color=PALETTE["border"],
+            text_color=PALETTE["text_secondary"],
+            font=("Courier New", 10, "bold"),
+            command=self._collapse_all
+        ).pack(side="left")
+
+        # Scrollable era sections
+        self.scroll = ctk.CTkScrollableFrame(
+            self, fg_color="transparent",
+            scrollbar_button_color=PALETTE["border"],
+            scrollbar_fg_color=PALETTE["surface"],
+        )
+        self.scroll.pack(fill="both", expand=True, padx=40, pady=(0, 32))
+
+        self._era_sections = []
+        for era in GOV_ERAS:
+            section = EraSection(self.scroll, era)
+            section.pack(fill="x", pady=(0, 12))
+            self._era_sections.append(section)
+
+    def _expand_all(self):
+        for section in self._era_sections:
+            if not section._expanded:
+                section._toggle()
+
+    def _collapse_all(self):
+        for section in self._era_sections:
+            if section._expanded:
+                section._toggle()
+
+
 class SettingsPanel(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master, fg_color="transparent")
@@ -1022,6 +1919,7 @@ class ExecutiveInsight(ctk.CTk):
             "Bills":        BillsPanel(self.content_area, self.engine),
             "Party Impact": PartyImpactPanel(self.content_area),
             "US Wars":      USWarsPanel(self.content_area),
+            "Gov. History": GovHistoryPanel(self.content_area),
             "Settings":     SettingsPanel(self.content_area),
         }
 
