@@ -2685,24 +2685,19 @@ class SettingsPanel(ctk.CTkFrame):
             col.pack(side="left", padx=(0, 16))
 
             is_active = (name == CURRENT_THEME[0])
+            size = 80 if is_active else 60
 
-            swatch = ctk.CTkFrame(col, width=64, height=64, corner_radius=12,
+            swatch = ctk.CTkFrame(col, width=size, height=size, corner_radius=12,
                                    fg_color=theme["bg"],
-                                   border_width=3 if is_active else 1,
-                                   border_color=theme["accent"])
+                                   border_width=0)
             swatch.pack()
             swatch.pack_propagate(False)
 
             # Accent dot inside
-            dot = ctk.CTkFrame(swatch, width=20, height=20, corner_radius=10,
+            dot_size = 24 if is_active else 18
+            dot = ctk.CTkFrame(swatch, width=dot_size, height=dot_size, corner_radius=dot_size // 2,
                                 fg_color=theme["accent"])
             dot.place(relx=0.5, rely=0.5, anchor="center")
-
-            # Active checkmark
-            if is_active:
-                ctk.CTkLabel(swatch, text="✓",
-                             font=("Courier New", 11, "bold"),
-                             text_color=theme["bg"]).place(relx=0.5, rely=0.5, anchor="center")
 
             ctk.CTkLabel(col, text=name,
                          font=("Courier New", 9, "bold" if is_active else "normal"),
