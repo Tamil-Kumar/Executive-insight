@@ -23,6 +23,8 @@ THEMES = {
         "text_dim":      "#3D4357",
         "positive":      "#3DAA72",
         "warning":       "#C9A84C",
+        "danger":        "#C95C4C",
+        "blue_soft":     "#3A6EA8",
         "dem_blue":      "#1A4F8A",
         "dem_light":     "#4A90D9",
         "rep_red":       "#8A1A1A",
@@ -43,6 +45,8 @@ THEMES = {
         "text_dim":      "#2E3F55",
         "positive":      "#43C98A",
         "warning":       "#F7C948",
+        "danger":        "#E05252",
+        "blue_soft":     "#4FC3F7",
         "dem_blue":      "#1A4F8A",
         "dem_light":     "#4A90D9",
         "rep_red":       "#8A1A1A",
@@ -63,6 +67,8 @@ THEMES = {
         "text_dim":      "#2E4228",
         "positive":      "#50C87E",
         "warning":       "#C8B450",
+        "danger":        "#C85050",
+        "blue_soft":     "#5088C8",
         "dem_blue":      "#1A4F8A",
         "dem_light":     "#4A90D9",
         "rep_red":       "#8A1A1A",
@@ -83,6 +89,8 @@ THEMES = {
         "text_dim":      "#A89A88",
         "positive":      "#2E7D32",
         "warning":       "#8B6914",
+        "danger":        "#B71C1C",
+        "blue_soft":     "#1565C0",
         "dem_blue":      "#1A4F8A",
         "dem_light":     "#1565C0",
         "rep_red":       "#8A1A1A",
@@ -103,6 +111,8 @@ THEMES = {
         "text_dim":      "#4A2A2A",
         "positive":      "#52A070",
         "warning":       "#E0A052",
+        "danger":        "#E05252",
+        "blue_soft":     "#5080C0",
         "dem_blue":      "#1A4F8A",
         "dem_light":     "#4A90D9",
         "rep_red":       "#8A1A1A",
@@ -470,29 +480,354 @@ class Sidebar(ctk.CTkFrame):
 # ── Panels ────────────────────────────────────────────────────────────────────
 
 class DashboardPanel(ctk.CTkFrame):
+
+    # ── Recent events feed ────────────────────────────────────────────────────
+    # Each entry: (date, category, headline, detail, color_key)
+    EVENTS = [
+        (
+            "Mar 8, 2026", "WAR",
+            "US–Iran War: 6 US KIA, operations ongoing",
+            "Operation Epic Fury airstrikes launched Feb 28 with Israel. Supreme Leader Khamenei killed. "
+            "US casualties confirmed at 6 KIA (Army reservists, Kuwait). Trump states 4–5 week timeline.",
+            "danger",
+        ),
+        (
+            "Feb 14, 2026", "GOVERNMENT",
+            "DHS Partial Shutdown begins",
+            "Second federal shutdown of 2026 began after Senate Democrats blocked DHS funding bill "
+            "following the killing of Alex Pretti by CBP agents on Jan 24. Immigration agencies operating "
+            "on mandatory funding and fees.",
+            "warning",
+        ),
+        (
+            "Feb 3, 2026", "GOVERNMENT",
+            "4-day federal shutdown ends",
+            "The Jan 31 – Feb 3 partial shutdown ended after Congress passed a continuing resolution. "
+            "Seven Republicans joined all Democrats in initially blocking the funding package over DHS "
+            "reform disagreements.",
+            "positive",
+        ),
+        (
+            "Jan 1, 2026", "POLICY",
+            "Expanded Travel Ban takes effect — 39 countries",
+            "Presidential Proclamation 10998 (Dec 16, 2025) expanded entry restrictions to nationals "
+            "of 39 countries plus Palestinian Authority travel document holders. 19 countries face full "
+            "suspension; 20 face partial suspension.",
+            "accent",
+        ),
+        (
+            "Nov 12, 2025", "GOVERNMENT",
+            "Government shutdown ends after 42 days",
+            "Trump signed funding bill ending the Oct 1 shutdown. Deal included a continuing resolution "
+            "and full-year appropriations for Veterans Affairs, Agriculture, military construction, and "
+            "the Legislative Branch.",
+            "positive",
+        ),
+        (
+            "Oct 1, 2025", "GOVERNMENT",
+            "Federal government shutdown begins",
+            "Funding expired on Oct 1 after Congress failed to pass appropriations. Dispute centred on "
+            "ACA subsidy extensions — Democrats demanded renewal, Republicans refused.",
+            "danger",
+        ),
+        (
+            "Sep 14, 2025", "POLITICS",
+            "Charlie Kirk assassinated",
+            "Turning Point USA co-founder Charlie Kirk was killed. Speaker Mike Johnson, Karoline Leavitt "
+            "and Tulsi Gabbard attended memorials. TPUSA reported 121,000 new chapter requests in the "
+            "two weeks following his death.",
+            "danger",
+        ),
+        (
+            "Aug 19, 2025", "POLICY",
+            "USCIS expands social media vetting to include 'anti-Americanism'",
+            "US Citizenship and Immigration Services announced it will review social media for "
+            "'anti-American' and 'antisemitic' activity, treating findings as an 'overwhelmingly "
+            "negative factor' in immigration benefit decisions.",
+            "warning",
+        ),
+        (
+            "Jun 4, 2025", "POLICY",
+            "First Travel Ban — 19 countries suspended",
+            "Trump issued a proclamation suspending entry of certain nationals from 19 countries, "
+            "citing deficiencies in security screening. Expanded in December to 39 countries.",
+            "warning",
+        ),
+        (
+            "Jan 20, 2025", "POLITICS",
+            "Trump inaugurated for second term",
+            "Donald J. Trump was inaugurated as the 47th President of the United States — the first "
+            "convicted felon elected to the presidency. JD Vance sworn in as Vice President. A wave of "
+            "executive orders signed on day one targeting immigration, DEI, and federal workforce.",
+            "accent",
+        ),
+        (
+            "Nov 5, 2024", "POLITICS",
+            "Trump wins 2024 presidential election",
+            "Donald Trump defeated Vice President Kamala Harris in a decisive Electoral College victory. "
+            "Republicans also recaptured the Senate. Trump became the first president in US history "
+            "to win a non-consecutive second term since Grover Cleveland.",
+            "accent",
+        ),
+        (
+            "Jul 13, 2024", "POLITICS",
+            "Trump assassination attempt — Butler, Pennsylvania",
+            "A gunman opened fire at a Trump rally in Butler, PA. Trump was struck in the right ear "
+            "and raised his fist to the crowd. One rallygoer was killed and two others critically "
+            "wounded. The 20-year-old shooter was killed by Secret Service.",
+            "danger",
+        ),
+        (
+            "Jun 1, 2024", "LEGAL",
+            "Trump convicted on 34 felony counts",
+            "Donald Trump became the first former US president convicted of felony crimes. A New York "
+            "jury found him guilty on all 34 counts of falsifying business records. Sentencing was "
+            "later deferred after his election victory.",
+            "danger",
+        ),
+        (
+            "Jan 6, 2021", "POLITICS",
+            "Capitol riot — certification of 2020 election disrupted",
+            "Supporters of President Trump stormed the US Capitol building, disrupting the congressional "
+            "certification of Joe Biden's election victory. Over 1,000 people were charged. Trump was "
+            "impeached for a second time eight days later.",
+            "danger",
+        ),
+        (
+            "Mar 11, 2020", "CRISIS",
+            "COVID-19 declared a global pandemic",
+            "The WHO declared COVID-19 a pandemic. The US eventually recorded the world's highest death "
+            "toll — over 1.1 million Americans died. Congress passed $5+ trillion in emergency relief. "
+            "Operation Warp Speed delivered vaccines by late 2020.",
+            "warning",
+        ),
+    ]
+
+    CATEGORY_COLORS = {
+        "WAR":        "danger",
+        "GOVERNMENT": "blue_soft",
+        "POLICY":     "warning",
+        "POLITICS":   "accent",
+        "LEGAL":      "rep_light",
+        "CRISIS":     "danger",
+    }
+
     def __init__(self, master, engine):
         super().__init__(master, fg_color="transparent")
+        self._build(engine)
 
-        ctk.CTkLabel(self, text="Platform Overview", font=("Georgia", 24, "bold"),
-                     text_color=PALETTE["text_primary"]).pack(anchor="w", padx=40, pady=(40, 20))
+    def _build(self, engine):
+        # ── Header ────────────────────────────────────────────────────────
+        hdr = ctk.CTkFrame(self, fg_color="transparent")
+        hdr.pack(fill="x", padx=40, pady=(32, 0))
 
+        ctk.CTkLabel(hdr, text="Platform Overview",
+                     font=("Georgia", 24, "bold"),
+                     text_color=PALETTE["text_primary"], anchor="w").pack(side="left")
+
+        # Live indicator
+        live = ctk.CTkFrame(hdr, fg_color=PALETTE["surface_2"], corner_radius=4,
+                             border_width=1, border_color=PALETTE["border"])
+        live.pack(side="right", pady=6)
+        dot = ctk.CTkFrame(live, width=7, height=7, corner_radius=4,
+                            fg_color=PALETTE["positive"])
+        dot.pack(side="left", padx=(10, 4), pady=6)
+        dot.pack_propagate(False)
+        ctk.CTkLabel(live, text="LIVE  ",
+                     font=("Courier New", 9, "bold"),
+                     text_color=PALETTE["positive"]).pack(side="left")
+
+        ctk.CTkLabel(self,
+                     text="Executive intelligence dashboard — current status and recent historical events.",
+                     font=("Courier New", 11),
+                     text_color=PALETTE["text_secondary"], anchor="w"
+                     ).pack(fill="x", padx=40, pady=(4, 20))
+
+        # ── Stat cards ────────────────────────────────────────────────────
         stats_frame = ctk.CTkFrame(self, fg_color="transparent")
-        stats_frame.pack(fill="x", padx=40)
+        stats_frame.pack(fill="x", padx=40, pady=(0, 24))
 
-        self.create_stat_card(stats_frame, "DATABASE RECORDS", str(len(engine.all_data_content)), 0)
-        self.create_stat_card(stats_frame, "ACTIVE LIBRARIES", str(len(engine.csv_files)),        1)
-        self.create_stat_card(stats_frame, "AI STATUS",        "CONNECTED",                       2)
+        self._stat_card(stats_frame, "DATABASE RECORDS", str(len(engine.all_data_content)), 0)
+        self._stat_card(stats_frame, "ACTIVE LIBRARIES",  str(len(engine.csv_files)),        1)
+        self._stat_card(stats_frame, "ACTIVE CONFLICTS",  "2",                               2)
+        self._stat_card(stats_frame, "AI STATUS",         "CONNECTED",                       3)
 
-    def create_stat_card(self, master, title, value, col):
+        # ── Two-column layout: feed left, filter right ────────────────────
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=40, pady=(0, 32))
+        body.columnconfigure(0, weight=3)
+        body.columnconfigure(1, weight=1)
+
+        # Feed column
+        feed_frame = ctk.CTkFrame(body, fg_color="transparent")
+        feed_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 16))
+
+        feed_hdr = ctk.CTkFrame(feed_frame, fg_color="transparent")
+        feed_hdr.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(feed_hdr, text="RECENT EVENTS & HISTORY",
+                     font=("Courier New", 9, "bold"),
+                     text_color=PALETTE["text_dim"], anchor="w").pack(side="left")
+
+        ctk.CTkLabel(feed_hdr,
+                     text=f"{len(self.EVENTS)} events",
+                     font=("Courier New", 9),
+                     text_color=PALETTE["text_dim"]).pack(side="right")
+
+        self._feed_scroll = ctk.CTkScrollableFrame(
+            feed_frame, fg_color=PALETTE["surface"],
+            corner_radius=10, border_width=1, border_color=PALETTE["border"],
+            scrollbar_button_color=PALETTE["border"],
+        )
+        self._feed_scroll.pack(fill="both", expand=True)
+        self._event_cards = []
+        self._active_filter = "ALL"
+        self._render_feed("ALL")
+
+        # Filter column
+        filter_frame = ctk.CTkFrame(body, fg_color="transparent")
+        filter_frame.grid(row=0, column=1, sticky="nsew")
+
+        ctk.CTkLabel(filter_frame, text="FILTER BY CATEGORY",
+                     font=("Courier New", 9, "bold"),
+                     text_color=PALETTE["text_dim"], anchor="w").pack(fill="x", pady=(0, 10))
+
+        categories = ["ALL", "WAR", "POLITICS", "POLICY", "GOVERNMENT", "LEGAL", "CRISIS"]
+        self._filter_btns = {}
+        for cat in categories:
+            color = PALETTE.get(self.CATEGORY_COLORS.get(cat, "text_secondary"),
+                                PALETTE["text_secondary"])
+            btn = ctk.CTkButton(
+                filter_frame,
+                text=cat,
+                height=34, corner_radius=6,
+                fg_color=PALETTE["accent"] if cat == "ALL" else PALETTE["surface_2"],
+                hover_color=PALETTE["accent_dim"],
+                text_color=PALETTE["bg"] if cat == "ALL" else PALETTE["text_secondary"],
+                font=("Courier New", 10, "bold"),
+                command=lambda c=cat: self._filter(c)
+            )
+            btn.pack(fill="x", pady=(0, 6))
+            self._filter_btns[cat] = btn
+
+        # Ongoing alerts box
+        ctk.CTkLabel(filter_frame, text="ACTIVE ALERTS",
+                     font=("Courier New", 9, "bold"),
+                     text_color=PALETTE["text_dim"], anchor="w").pack(fill="x", pady=(16, 8))
+
+        alerts = [
+            ("● Iran War",         "Ongoing since Feb 28",  "danger"),
+            ("● DHS Shutdown",     "Ongoing since Feb 14",  "warning"),
+            ("● Travel Ban",       "39 countries, active",  "warning"),
+        ]
+        for label, sub, color_key in alerts:
+            alert_card = ctk.CTkFrame(filter_frame, fg_color=PALETTE["surface"],
+                                       corner_radius=6, border_width=1,
+                                       border_color=PALETTE["border"])
+            alert_card.pack(fill="x", pady=(0, 6))
+
+            ctk.CTkLabel(alert_card, text=label,
+                         font=("Courier New", 10, "bold"),
+                         text_color=PALETTE.get(color_key, PALETTE["accent"]),
+                         anchor="w").pack(fill="x", padx=12, pady=(8, 2))
+            ctk.CTkLabel(alert_card, text=sub,
+                         font=("Courier New", 9),
+                         text_color=PALETTE["text_dim"], anchor="w").pack(fill="x", padx=12, pady=(0, 8))
+
+    def _stat_card(self, master, title, value, col):
         card = ctk.CTkFrame(master, fg_color=PALETTE["surface"],
-                            border_color=PALETTE["border"], border_width=1, height=120)
-        card.grid(row=0, column=col, padx=(0, 20), sticky="nsew")
+                            border_color=PALETTE["border"], border_width=1,
+                            corner_radius=8, height=100)
+        card.grid(row=0, column=col, padx=(0, 14) if col < 3 else 0, sticky="nsew")
         master.grid_columnconfigure(col, weight=1)
 
-        ctk.CTkLabel(card, text=title, font=("Courier New", 10, "bold"),
-                     text_color=PALETTE["text_secondary"]).pack(pady=(20, 5))
-        ctk.CTkLabel(card, text=value, font=("Georgia", 20, "bold"),
-                     text_color=PALETTE["accent"]).pack(pady=(0, 20))
+        ctk.CTkLabel(card, text=title, font=("Courier New", 9, "bold"),
+                     text_color=PALETTE["text_secondary"]).pack(pady=(16, 4))
+        ctk.CTkLabel(card, text=value, font=("Georgia", 18, "bold"),
+                     text_color=PALETTE["accent"]).pack(pady=(0, 16))
+
+    def _filter(self, category):
+        self._active_filter = category
+        # Update button styles
+        for cat, btn in self._filter_btns.items():
+            if cat == category:
+                btn.configure(fg_color=PALETTE["accent"],
+                              text_color=PALETTE["bg"])
+            else:
+                btn.configure(fg_color=PALETTE["surface_2"],
+                              text_color=PALETTE["text_secondary"])
+        self._render_feed(category)
+
+    def _render_feed(self, category):
+        for w in self._feed_scroll.winfo_children():
+            w.destroy()
+
+        filtered = [e for e in self.EVENTS
+                    if category == "ALL" or e[1] == category]
+
+        if not filtered:
+            ctk.CTkLabel(self._feed_scroll, text="No events in this category.",
+                         font=("Courier New", 11),
+                         text_color=PALETTE["text_dim"]).pack(pady=30)
+            return
+
+        for date, cat, headline, detail, color_key in filtered:
+            self._make_event_card(date, cat, headline, detail, color_key)
+
+    def _make_event_card(self, date, cat, headline, detail, color_key):
+        color = PALETTE.get(color_key, PALETTE["accent"])
+        cat_color = PALETTE.get(
+            self.CATEGORY_COLORS.get(cat, "text_secondary"),
+            PALETTE["text_secondary"]
+        )
+
+        card = ctk.CTkFrame(self._feed_scroll, fg_color="transparent",
+                             corner_radius=0)
+        card.pack(fill="x")
+
+        inner = ctk.CTkFrame(card, fg_color="transparent")
+        inner.pack(fill="x", padx=16, pady=10)
+
+        # Top row: date + category badge
+        top = ctk.CTkFrame(inner, fg_color="transparent")
+        top.pack(fill="x", pady=(0, 4))
+
+        # Left colour bar accent
+        ctk.CTkFrame(inner, width=3, height=0, fg_color=color,
+                     corner_radius=2).pack(side="left", fill="y", padx=(0, 12))
+
+        content = ctk.CTkFrame(inner, fg_color="transparent")
+        content.pack(side="left", fill="x", expand=True)
+
+        meta_row = ctk.CTkFrame(content, fg_color="transparent")
+        meta_row.pack(fill="x", pady=(0, 3))
+
+        ctk.CTkLabel(meta_row, text=date,
+                     font=("Courier New", 9, "bold"),
+                     text_color=PALETTE["text_dim"], anchor="w").pack(side="left")
+
+        badge = ctk.CTkFrame(meta_row, fg_color=PALETTE["surface_2"],
+                              corner_radius=3)
+        badge.pack(side="left", padx=(8, 0))
+        ctk.CTkLabel(badge, text=cat,
+                     font=("Courier New", 8, "bold"),
+                     text_color=cat_color).pack(padx=6, pady=2)
+
+        ctk.CTkLabel(content, text=headline,
+                     font=("Georgia", 12, "bold"),
+                     text_color=PALETTE["text_primary"],
+                     anchor="w", wraplength=520, justify="left"
+                     ).pack(fill="x", pady=(0, 4))
+
+        ctk.CTkLabel(content, text=detail,
+                     font=("Courier New", 10),
+                     text_color=PALETTE["text_secondary"],
+                     anchor="w", wraplength=520, justify="left"
+                     ).pack(fill="x")
+
+        # Divider
+        ctk.CTkFrame(self._feed_scroll, height=1,
+                     fg_color=PALETTE["border"], corner_radius=0).pack(fill="x", padx=12)
 
 
 class LegalQAPanel(ctk.CTkFrame):
@@ -2333,71 +2668,54 @@ class SettingsPanel(ctk.CTkFrame):
         # ── Theme selector ────────────────────────────────────────────────
         self._section(container, "APPEARANCE", first=True)
 
-        theme_row = ctk.CTkFrame(container, fg_color="transparent")
-        theme_row.pack(fill="x", padx=30, pady=(0, 8))
-
-        ctk.CTkLabel(theme_row, text="Colour Theme",
-                     font=("Georgia", 14, "bold"),
-                     text_color=PALETTE["text_primary"],
-                     anchor="w").pack(side="left", fill="x", expand=True)
-
-        self.theme_menu = ctk.CTkOptionMenu(
-            theme_row,
-            values=list(THEMES.keys()),
-            width=200, height=34, corner_radius=8,
-            fg_color=PALETTE["surface_2"],
-            button_color=PALETTE["accent"],
-            button_hover_color=PALETTE["accent_dim"],
-            dropdown_fg_color=PALETTE["surface_2"],
-            dropdown_text_color=PALETTE["text_primary"],
-            dropdown_hover_color=PALETTE["border"],
-            text_color=PALETTE["text_primary"],
-            font=("Courier New", 12),
-            command=self._on_theme_selected,
-        )
-        self.theme_menu.set(CURRENT_THEME[0])
-        self.theme_menu.pack(side="right")
-
         ctk.CTkLabel(
             container,
-            text="Changes take effect immediately across the entire application.",
+            text="Select a theme — changes apply instantly across the entire application.",
             font=("Courier New", 10),
             text_color=PALETTE["text_dim"], anchor="w"
-        ).pack(fill="x", padx=30, pady=(0, 20))
+        ).pack(fill="x", padx=30, pady=(0, 16))
 
         # Theme preview swatches
         swatch_frame = ctk.CTkFrame(container, fg_color="transparent")
         swatch_frame.pack(fill="x", padx=30, pady=(0, 24))
 
         self.swatches = {}
-        for i, (name, theme) in enumerate(THEMES.items()):
-            col = ctk.CTkFrame(swatch_frame, fg_color="transparent")
-            col.pack(side="left", padx=(0, 12))
+        for name, theme in THEMES.items():
+            col = ctk.CTkFrame(swatch_frame, fg_color="transparent", cursor="hand2")
+            col.pack(side="left", padx=(0, 16))
 
-            swatch = ctk.CTkFrame(col, width=48, height=48, corner_radius=8,
+            is_active = (name == CURRENT_THEME[0])
+
+            swatch = ctk.CTkFrame(col, width=64, height=64, corner_radius=12,
                                    fg_color=theme["bg"],
-                                   border_width=2,
+                                   border_width=3 if is_active else 1,
                                    border_color=theme["accent"])
             swatch.pack()
             swatch.pack_propagate(False)
 
             # Accent dot inside
-            dot = ctk.CTkFrame(swatch, width=16, height=16, corner_radius=8,
+            dot = ctk.CTkFrame(swatch, width=20, height=20, corner_radius=10,
                                 fg_color=theme["accent"])
             dot.place(relx=0.5, rely=0.5, anchor="center")
 
-            ctk.CTkLabel(col, text=name.split(" ")[0],
-                         font=("Courier New", 9),
-                         text_color=PALETTE["text_dim"]).pack(pady=(4, 0))
+            # Active checkmark
+            if is_active:
+                ctk.CTkLabel(swatch, text="✓",
+                             font=("Courier New", 11, "bold"),
+                             text_color=theme["bg"]).place(relx=0.5, rely=0.5, anchor="center")
 
-            self.swatches[name] = swatch
+            ctk.CTkLabel(col, text=name,
+                         font=("Courier New", 9, "bold" if is_active else "normal"),
+                         text_color=theme["accent"] if is_active else PALETTE["text_dim"]
+                         ).pack(pady=(6, 0))
+
+            self.swatches[name] = (swatch, dot, col)
 
             def _click(e, n=name):
                 self._on_theme_selected(n)
-                self.theme_menu.set(n)
 
-            swatch.bind("<Button-1>", _click)
-            dot.bind("<Button-1>", _click)
+            for w in (swatch, dot, col):
+                w.bind("<Button-1>", _click)
 
         # ── Divider ───────────────────────────────────────────────────────
         ctk.CTkFrame(container, height=1, fg_color=PALETTE["border"]).pack(
@@ -2430,10 +2748,7 @@ class SettingsPanel(ctk.CTkFrame):
 
     def _on_theme_selected(self, name):
         self.on_theme_change(name)
-        # Highlight active swatch
-        for n, swatch in self.swatches.items():
-            swatch.configure(border_color=THEMES[n]["accent"],
-                             border_width=3 if n == name else 1)
+        # UI is rebuilt by on_theme_change so no swatch update needed here
 
 
 # ── Main Application ──────────────────────────────────────────────────────────
