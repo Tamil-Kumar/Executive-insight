@@ -127,6 +127,35 @@ THEMES = {
 PALETTE = dict(THEMES["Executive Dark"])
 CURRENT_THEME = ["Executive Dark"]  # mutable container so panels can read it
 
+# ── Theme Registry — instant recolour without rebuild ─────────────────────────
+# Each entry: (widget, {ctk_kwarg: palette_key, ...})
+# e.g. (my_label, {"text_color": "accent", "fg_color": "surface"})
+_THEME_REGISTRY: list = []
+
+def tr(widget, **palette_kwargs):
+    """Register a widget for live theme updates. Returns the widget."""
+    _THEME_REGISTRY.append((widget, palette_kwargs))
+    return widget
+
+def apply_theme_to_registry():
+    """Walk registry and push new palette values into every widget."""
+    dead = []
+    for i, (w, kwargs) in enumerate(_THEME_REGISTRY):
+        try:
+            w.winfo_exists()
+        except Exception:
+            dead.append(i)
+            continue
+        try:
+            updates = {k: PALETTE[v] for k, v in kwargs.items() if v in PALETTE}
+            if updates:
+                w.configure(**updates)
+        except Exception:
+            dead.append(i)
+    # Prune dead widgets (reversed so indices stay valid)
+    for i in reversed(dead):
+        _THEME_REGISTRY.pop(i)
+
 # ── Party Data ────────────────────────────────────────────────────────────────
 
 PARTY_DATA = {
@@ -421,23 +450,32 @@ class SidebarButton(ctk.CTkButton):
             font=("Georgia", 13, "bold"),
             **kwargs
         )
+        tr(self, text_color="text_secondary", hover_color="surface_2")
 
 
 class Sidebar(ctk.CTkFrame):
     def __init__(self, master, on_select):
         super().__init__(master, fg_color=PALETTE["surface"], width=240, corner_radius=0)
+        tr(self, fg_color="surface")
         self.on_select = on_select
         self._active   = None
 
         brand_frame = ctk.CTkFrame(self, fg_color="transparent")
         brand_frame.pack(fill="x", padx=20, pady=30)
 
-        ctk.CTkLabel(brand_frame, text="EXECUTIVE", font=("Georgia", 20, "bold"),
-                     text_color=PALETTE["accent"]).pack(anchor="w")
-        ctk.CTkLabel(brand_frame, text="INSIGHT", font=("Courier New", 12, "bold"),
-                     text_color=PALETTE["text_secondary"]).pack(anchor="w")
+        self._brand_label = ctk.CTkLabel(brand_frame, text="EXECUTIVE", font=("Georgia", 20, "bold"),
+                     text_color=PALETTE["accent"])
+        self._brand_label.pack(anchor="w")
+        tr(self._brand_label, text_color="accent")
 
-        ctk.CTkFrame(self, height=1, fg_color=PALETTE["border"]).pack(fill="x", padx=16, pady=(0, 10))
+        self._brand_sub = ctk.CTkLabel(brand_frame, text="INSIGHT", font=("Courier New", 12, "bold"),
+                     text_color=PALETTE["text_secondary"])
+        self._brand_sub.pack(anchor="w")
+        tr(self._brand_sub, text_color="text_secondary")
+
+        self._divider = ctk.CTkFrame(self, height=1, fg_color=PALETTE["border"])
+        self._divider.pack(fill="x", padx=16, pady=(0, 10))
+        tr(self._divider, fg_color="border")
 
         self._nav_btns = {}
 
@@ -456,7 +494,9 @@ class Sidebar(ctk.CTkFrame):
 
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.pack(side="bottom", fill="x", padx=10, pady=20)
-        ctk.CTkFrame(footer, height=1, fg_color=PALETTE["border"]).pack(fill="x", pady=(0, 10))
+        self._footer_div = ctk.CTkFrame(footer, height=1, fg_color=PALETTE["border"])
+        self._footer_div.pack(fill="x", pady=(0, 10))
+        tr(self._footer_div, fg_color="border")
         settings_btn = SidebarButton(footer, "  Settings", lambda: on_select("Settings"))
         settings_btn.pack(fill="x")
         self._nav_btns["Settings"] = settings_btn
@@ -475,6 +515,12 @@ class Sidebar(ctk.CTkFrame):
                     text_color=PALETTE["text_secondary"],
                 )
         self._active = name
+
+    def refresh_theme(self):
+        """Re-apply palette to tk.Button tabs inside Bills panel (non-CTk widgets)."""
+        # Re-run set_active to repaint active button correctly after palette swap
+        if self._active:
+            self.set_active(self._active)
 
 
 # ── Panels ────────────────────────────────────────────────────────────────────
@@ -740,11 +786,14 @@ class DashboardPanel(ctk.CTkFrame):
                             corner_radius=8, height=100)
         card.grid(row=0, column=col, padx=(0, 14) if col < 3 else 0, sticky="nsew")
         master.grid_columnconfigure(col, weight=1)
+        tr(card, fg_color="surface", border_color="border")
 
-        ctk.CTkLabel(card, text=title, font=("Courier New", 9, "bold"),
-                     text_color=PALETTE["text_secondary"]).pack(pady=(16, 4))
-        ctk.CTkLabel(card, text=value, font=("Georgia", 18, "bold"),
-                     text_color=PALETTE["accent"]).pack(pady=(0, 16))
+        tr(ctk.CTkLabel(card, text=title, font=("Courier New", 9, "bold"),
+                     text_color=PALETTE["text_secondary"]),
+           text_color="text_secondary").pack(pady=(16, 4))
+        tr(ctk.CTkLabel(card, text=value, font=("Georgia", 18, "bold"),
+                     text_color=PALETTE["accent"]),
+           text_color="accent").pack(pady=(0, 16))
 
     def _filter(self, category):
         self._active_filter = category
@@ -2657,13 +2706,15 @@ class SettingsPanel(ctk.CTkFrame):
         self._build()
 
     def _build(self):
-        ctk.CTkLabel(self, text="Preferences", font=("Georgia", 24, "bold"),
-                     text_color=PALETTE["text_primary"]).pack(anchor="w", padx=40, pady=(40, 20))
+        tr(ctk.CTkLabel(self, text="Preferences", font=("Georgia", 24, "bold"),
+                     text_color=PALETTE["text_primary"]),
+           text_color="text_primary").pack(anchor="w", padx=40, pady=(40, 20))
 
         container = ctk.CTkFrame(self, fg_color=PALETTE["surface"],
                                   border_color=PALETTE["border"], border_width=1,
                                   corner_radius=12)
         container.pack(fill="x", padx=40, pady=(0, 20))
+        tr(container, fg_color="surface", border_color="border")
 
         # ── Theme selector ────────────────────────────────────────────────
         self._section(container, "APPEARANCE", first=True)
@@ -2758,12 +2809,8 @@ class ExecutiveInsight(ctk.CTk):
         self._build_ui()
         self._show_panel("Dashboard")
 
-    # ── Build all UI from current PALETTE ─────────────────────────────────────
+    # ── Build UI once ─────────────────────────────────────────────────────────
     def _build_ui(self):
-        # Destroy any previous body if rebuilding
-        for w in self.winfo_children():
-            w.destroy()
-
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True)
 
@@ -2772,9 +2819,11 @@ class ExecutiveInsight(ctk.CTk):
 
         self._divider = ctk.CTkFrame(body, width=1, fg_color=PALETTE["border"], corner_radius=0)
         self._divider.pack(side="left", fill="y")
+        tr(self._divider, fg_color="border")
 
         self.content_area = ctk.CTkFrame(body, fg_color=PALETTE["bg"], corner_radius=0)
         self.content_area.pack(side="left", fill="both", expand=True)
+        tr(self.content_area, fg_color="bg")
 
         self.panels = {
             "Dashboard":    DashboardPanel(self.content_area, self.engine),
@@ -2786,23 +2835,23 @@ class ExecutiveInsight(ctk.CTk):
             "Settings":     SettingsPanel(self.content_area, on_theme_change=self._apply_theme),
         }
 
-    # ── Theme application ──────────────────────────────────────────────────────
+    # ── Instant theme switch — no rebuild ─────────────────────────────────────
     def _apply_theme(self, theme_name):
         if theme_name not in THEMES:
             return
 
-        # Update global palette in-place so all future widget refs use new colours
         PALETTE.update(THEMES[theme_name])
         CURRENT_THEME[0] = theme_name
 
-        # Switch CTk light/dark mode if needed
         ctk.set_appearance_mode(PALETTE["ctk_mode"])
-
-        # Update root window background
         self.configure(fg_color=PALETTE["bg"])
 
-        # Rebuild the entire UI with the new palette
-        self._build_ui()
+        # Recolour every registered widget instantly
+        apply_theme_to_registry()
+
+        # Sidebar needs manual refresh (uses tk.Button which isn't CTk)
+        self.sidebar.refresh_theme()
+
         self._show_panel("Settings")
 
     # ── Panel switching ────────────────────────────────────────────────────────
