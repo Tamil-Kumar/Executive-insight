@@ -480,12 +480,17 @@ class Sidebar(ctk.CTkFrame):
         self._nav_btns = {}
 
         nav_items = [
-            ("Dashboard",   "  Dashboard"),
-            ("Legal Q&A",   "  Legal Q&A"),
-            ("Bills",       "  Bills"),
-            ("Party Impact","  Party Impact"),
-            ("US Wars",     "  US Wars"),
-            ("Gov. History","  Gov. History"),
+            ("Dashboard",    "  Dashboard"),
+            ("Legal Q&A",    "  Legal Q&A"),
+            ("Bills",        "  Bills"),
+            ("Party Impact", "  Party Impact"),
+            ("US Wars",      "  US Wars"),
+            ("Gov. History", "  Gov. History"),
+            ("Elections",    "  Elections"),
+            ("Economy",      "  Economy"),
+            ("Congress",     "  Congress"),
+            ("Supreme Court","  Supreme Court"),
+            ("Search",       "  🔍 Global Search"),
         ]
         for key, label in nav_items:
             btn = SidebarButton(self, label, lambda k=key: on_select(k))
@@ -2699,6 +2704,749 @@ class GovHistoryPanel(ctk.CTkFrame):
                 section._toggle()
 
 
+                section._toggle()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  ELECTION HISTORY PANEL
+# ══════════════════════════════════════════════════════════════════════════════
+
+ELECTION_DATA = [
+    {"year":2024,"winner":"Donald Trump","winner_party":"R","loser":"Kamala Harris","loser_party":"D","ev_winner":312,"ev_loser":226,"pv_winner":49.8,"pv_loser":48.3,"margin_pv":1.5,"notes":"Trump became first president elected to non-consecutive terms since Cleveland. First felon elected president."},
+    {"year":2020,"winner":"Joe Biden","winner_party":"D","loser":"Donald Trump","loser_party":"R","ev_winner":306,"ev_loser":232,"pv_winner":51.3,"pv_loser":46.9,"margin_pv":4.4,"notes":"Highest voter turnout in US history (158M votes). Trump refused to concede; January 6 Capitol riot followed."},
+    {"year":2016,"winner":"Donald Trump","winner_party":"R","loser":"Hillary Clinton","loser_party":"D","ev_winner":306,"ev_loser":232,"pv_winner":46.1,"pv_loser":48.2,"margin_pv":-2.1,"notes":"Clinton won popular vote by 2.9M but lost Electoral College. Surprise result shocked most forecasters."},
+    {"year":2012,"winner":"Barack Obama","winner_party":"D","loser":"Mitt Romney","loser_party":"R","ev_winner":332,"ev_loser":206,"pv_winner":51.1,"pv_loser":47.2,"margin_pv":3.9,"notes":"Obama won all swing states except North Carolina. Romney campaign famously used flawed internal polling ('Project Orca')."},
+    {"year":2008,"winner":"Barack Obama","winner_party":"D","loser":"John McCain","loser_party":"R","ev_winner":365,"ev_loser":173,"pv_winner":52.9,"pv_loser":45.7,"margin_pv":7.2,"notes":"Obama became first African-American president. Financial crisis dominated final weeks; McCain suspended campaign briefly."},
+    {"year":2004,"winner":"George W. Bush","winner_party":"R","loser":"John Kerry","loser_party":"D","ev_winner":286,"ev_loser":251,"pv_winner":50.7,"pv_loser":48.3,"margin_pv":2.4,"notes":"First incumbent to win majority of popular vote since 1988. Ohio was decisive; 'Swift Boat' ads damaged Kerry."},
+    {"year":2000,"winner":"George W. Bush","winner_party":"R","loser":"Al Gore","loser_party":"D","ev_winner":271,"ev_loser":266,"pv_winner":47.9,"pv_loser":48.4,"margin_pv":-0.5,"notes":"Gore won popular vote by ~540K. Florida recount decided by Supreme Court (Bush v. Gore). Closest modern election."},
+    {"year":1996,"winner":"Bill Clinton","winner_party":"D","loser":"Bob Dole","loser_party":"R","ev_winner":379,"ev_loser":159,"pv_winner":49.2,"pv_loser":40.7,"margin_pv":8.5,"notes":"Ross Perot ran again as Reform Party candidate (8.4%). Clinton cruised on strong economy."},
+    {"year":1992,"winner":"Bill Clinton","winner_party":"D","loser":"George H.W. Bush","loser_party":"R","ev_winner":370,"ev_loser":168,"pv_winner":43.0,"pv_loser":37.4,"margin_pv":5.6,"notes":"Ross Perot won 18.9% of popular vote — best third-party showing since 1912. 'It's the economy, stupid.'"},
+    {"year":1988,"winner":"George H.W. Bush","winner_party":"R","loser":"Michael Dukakis","loser_party":"D","ev_winner":426,"ev_loser":111,"pv_winner":53.4,"pv_loser":45.6,"margin_pv":7.8,"notes":"Bush rode Reagan's coattails. 'Willie Horton' ad and Dukakis's tank photo became infamous campaign moments."},
+    {"year":1984,"winner":"Ronald Reagan","winner_party":"R","loser":"Walter Mondale","loser_party":"D","ev_winner":525,"ev_loser":13,"pv_winner":58.8,"pv_loser":40.6,"margin_pv":18.2,"notes":"Largest Electoral College victory in history. Mondale only won Minnesota (his home state) + D.C."},
+    {"year":1980,"winner":"Ronald Reagan","winner_party":"R","loser":"Jimmy Carter","loser_party":"D","ev_winner":489,"ev_loser":49,"pv_winner":50.7,"pv_loser":41.0,"margin_pv":9.7,"notes":"Iran hostage crisis and stagflation doomed Carter. Anderson ran as independent (6.6%). Reagan's 'Morning in America' resonated."},
+    {"year":1976,"winner":"Jimmy Carter","winner_party":"D","loser":"Gerald Ford","loser_party":"R","ev_winner":297,"ev_loser":240,"pv_winner":50.1,"pv_loser":48.0,"margin_pv":2.1,"notes":"Ford never recovered from Nixon pardon. Carter narrowly won — only Southern Democrat to win since FDR."},
+    {"year":1972,"winner":"Richard Nixon","winner_party":"R","loser":"George McGovern","loser_party":"D","ev_winner":520,"ev_loser":17,"pv_winner":60.7,"pv_loser":37.5,"margin_pv":23.2,"notes":"Nixon won 49 states. McGovern's VP pick Eagleton dropped out after mental health history revealed. Watergate unfolded months later."},
+    {"year":1968,"winner":"Richard Nixon","winner_party":"R","loser":"Hubert Humphrey","loser_party":"D","ev_winner":301,"ev_loser":191,"pv_winner":43.4,"pv_loser":42.7,"margin_pv":0.7,"notes":"George Wallace won 46 EV as third party. RFK assassinated in June. Extremely close — decided in final days."},
+    {"year":1964,"winner":"Lyndon Johnson","winner_party":"D","loser":"Barry Goldwater","loser_party":"R","ev_winner":486,"ev_loser":52,"pv_winner":61.1,"pv_loser":38.5,"margin_pv":22.6,"notes":"Largest popular vote margin since Monroe. Goldwater's conservatism planted seeds of Reagan revolution."},
+    {"year":1960,"winner":"John F. Kennedy","winner_party":"D","loser":"Richard Nixon","loser_party":"R","ev_winner":303,"ev_loser":219,"pv_winner":49.7,"pv_loser":49.5,"margin_pv":0.2,"notes":"First televised debate changed the race. Closest popular vote of 20th century. First Catholic president elected."},
+]
+
+class ElectionCard(ctk.CTkFrame):
+    def __init__(self, master, data, **kw):
+        super().__init__(master, fg_color=PALETTE["surface"], corner_radius=10,
+                         border_width=1, border_color=PALETTE["border"], **kw)
+        tr(self, fg_color="surface", border_color="border")
+        self._expanded = False
+        self._data = data
+        self._build()
+
+    def _build(self):
+        d = self._data
+        w_color = PALETTE["rep_light"] if d["winner_party"]=="R" else PALETTE["dem_light"]
+        l_color = PALETTE["dem_light"] if d["winner_party"]=="R" else PALETTE["rep_light"]
+
+        # Left stripe
+        stripe = ctk.CTkFrame(self, width=4, fg_color=w_color, corner_radius=0)
+        stripe.place(x=0, y=0, relheight=1)
+
+        hdr = ctk.CTkFrame(self, fg_color="transparent", cursor="hand2")
+        hdr.pack(fill="x", padx=(16,16), pady=12)
+
+        # Year badge
+        yr = ctk.CTkFrame(hdr, width=58, height=58, corner_radius=10,
+                           fg_color=PALETTE["surface_2"], border_width=1, border_color=w_color)
+        yr.pack(side="left", padx=(4,14))
+        yr.pack_propagate(False)
+        tr(yr, fg_color="surface_2", border_color="rep_light" if d["winner_party"]=="R" else "dem_light")
+        ctk.CTkLabel(yr, text=str(d["year"]), font=("Georgia",15,"bold"),
+                     text_color=w_color).place(relx=.5,rely=.5,anchor="center")
+
+        info = ctk.CTkFrame(hdr, fg_color="transparent")
+        info.pack(side="left", fill="x", expand=True)
+
+        # Winner row
+        wr = ctk.CTkFrame(info, fg_color="transparent")
+        wr.pack(fill="x")
+        ctk.CTkLabel(wr, text=f"🏆  {d['winner']}",
+                     font=("Georgia",13,"bold"), text_color=w_color, anchor="w").pack(side="left")
+        ctk.CTkLabel(wr, text=f"  {d['ev_winner']} EV  •  {d['pv_winner']:.1f}%",
+                     font=("Courier New",10), text_color=PALETTE["text_secondary"], anchor="w").pack(side="left")
+
+        # Loser row
+        lr = ctk.CTkFrame(info, fg_color="transparent")
+        lr.pack(fill="x", pady=(2,0))
+        ctk.CTkLabel(lr, text=f"     {d['loser']}",
+                     font=("Georgia",12), text_color=PALETTE["text_secondary"], anchor="w").pack(side="left")
+        ctk.CTkLabel(lr, text=f"  {d['ev_loser']} EV  •  {d['pv_loser']:.1f}%",
+                     font=("Courier New",10), text_color=PALETTE["text_dim"], anchor="w").pack(side="left")
+
+        # Margin badge
+        margin = d["margin_pv"]
+        m_color = w_color if margin > 0 else l_color
+        m_text = f"+{margin:.1f}% PV" if margin > 0 else f"{margin:.1f}% PV"
+        mb = ctk.CTkFrame(hdr, fg_color=PALETTE["surface_2"], corner_radius=6)
+        mb.pack(side="right", padx=(8,0))
+        tr(mb, fg_color="surface_2")
+        ctk.CTkLabel(mb, text=m_text, font=("Courier New",10,"bold"),
+                     text_color=m_color).pack(padx=10,pady=6)
+
+        self.toggle_btn = ctk.CTkButton(hdr, text="▼", width=28, height=24,
+            corner_radius=4, fg_color=PALETTE["surface_2"], hover_color=PALETTE["border"],
+            text_color=PALETTE["text_secondary"], font=("Courier New",10,"bold"),
+            command=self._toggle)
+        self.toggle_btn.pack(side="right", padx=(0,6))
+        tr(self.toggle_btn, fg_color="surface_2", hover_color="border", text_color="text_secondary")
+
+        # EV bar
+        bar_bg = ctk.CTkFrame(self, height=6, fg_color=l_color, corner_radius=3)
+        bar_bg.pack(fill="x", padx=20, pady=(0,8))
+        total = d["ev_winner"] + d["ev_loser"]
+        w_frac = d["ev_winner"] / total if total else 0.5
+        bar_fg = ctk.CTkFrame(bar_bg, height=6, fg_color=w_color, corner_radius=3)
+        bar_fg.place(relx=0, rely=0, relwidth=w_frac, relheight=1)
+
+        # Detail body
+        self.body = ctk.CTkFrame(self, fg_color="transparent")
+        ctk.CTkLabel(self.body, text=d["notes"], font=("Courier New",10),
+                     text_color=PALETTE["text_secondary"], wraplength=820,
+                     justify="left", anchor="w").pack(fill="x", padx=24, pady=(0,16))
+        tr(ctk.CTkLabel(self.body, text=d["notes"], font=("Courier New",10),
+                     text_color=PALETTE["text_secondary"], wraplength=820,
+                     justify="left", anchor="w"), text_color="text_secondary")
+
+        for w in (hdr, info, wr, lr):
+            w.bind("<Button-1>", lambda e: self._toggle())
+
+    def _toggle(self):
+        self._expanded = not self._expanded
+        if self._expanded:
+            self.body.pack(fill="x")
+            self.toggle_btn.configure(text="▲")
+        else:
+            self.body.pack_forget()
+            self.toggle_btn.configure(text="▼")
+
+
+class ElectionHistoryPanel(ctk.CTkFrame):
+    def __init__(self, master, **kw):
+        super().__init__(master, fg_color="transparent", **kw)
+        self._build()
+
+    def _build(self):
+        hdr = ctk.CTkFrame(self, fg_color="transparent")
+        hdr.pack(fill="x", padx=40, pady=(32,4))
+        tr(ctk.CTkLabel(hdr, text="U.S. Presidential Election History",
+                     font=("Georgia",24,"bold"), text_color=PALETTE["text_primary"], anchor="w"),
+           text_color="text_primary").pack(side="left")
+
+        badge = ctk.CTkFrame(hdr, fg_color=PALETTE["surface_2"], corner_radius=4,
+                              border_width=1, border_color=PALETTE["border"])
+        badge.pack(side="right", pady=6)
+        tr(badge, fg_color="surface_2", border_color="border")
+        r_wins = sum(1 for e in ELECTION_DATA if e["winner_party"]=="R")
+        d_wins = len(ELECTION_DATA)-r_wins
+        ctk.CTkLabel(badge, text=f"  🔴 R: {r_wins}  |  🔵 D: {d_wins}  ({len(ELECTION_DATA)} elections)  ",
+                     font=("Courier New",9,"bold"), text_color=PALETTE["text_dim"]).pack(pady=4)
+
+        tr(ctk.CTkLabel(self, text="Popular vote, Electoral College results & key context for every modern election.",
+                     font=("Courier New",11), text_color=PALETTE["text_secondary"], anchor="w"),
+           text_color="text_secondary").pack(fill="x", padx=40, pady=(0,16))
+
+        # Filter row
+        frow = ctk.CTkFrame(self, fg_color="transparent")
+        frow.pack(fill="x", padx=40, pady=(0,12))
+        tr(ctk.CTkLabel(frow, text="FILTER:", font=("Courier New",9,"bold"),
+                     text_color=PALETTE["text_dim"]), text_color="text_dim").pack(side="left", padx=(0,10))
+        self._filter_var = ctk.StringVar(value="All")
+        for label in ("All","Republican wins","Democrat wins"):
+            ctk.CTkButton(frow, text=label, width=130, height=26, corner_radius=6,
+                fg_color=PALETTE["surface_2"], hover_color=PALETTE["border"],
+                text_color=PALETTE["text_secondary"], font=("Courier New",10,"bold"),
+                command=lambda l=label: self._filter(l)).pack(side="left", padx=(0,6))
+
+        scroll = ctk.CTkScrollableFrame(self, fg_color="transparent",
+            scrollbar_button_color=PALETTE["border"])
+        scroll.pack(fill="both", expand=True, padx=40, pady=(0,32))
+        self._scroll = scroll
+        self._render("All")
+
+    def _filter(self, label):
+        self._render(label)
+
+    def _render(self, label):
+        for w in self._scroll.winfo_children():
+            w.destroy()
+        for e in ELECTION_DATA:
+            if label=="Republican wins" and e["winner_party"]!="R": continue
+            if label=="Democrat wins" and e["winner_party"]!="D": continue
+            ElectionCard(self._scroll, e).pack(fill="x", pady=(0,10))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  ECONOMIC DASHBOARD PANEL
+# ══════════════════════════════════════════════════════════════════════════════
+
+ECON_DATA = {
+    "current": {
+        "gdp_growth": "2.4%", "inflation": "2.8%", "unemployment": "4.1%",
+        "fed_rate": "4.25–4.50%", "debt_trillion": 36.2, "sp500": "~5,600",
+        "as_of": "March 2026",
+    },
+    "eras": [
+        {"president":"Trump (2nd)","years":"2025–","gdp":"2.4%","inflation":"2.8%","unemployment":"4.1%","debt_start":36.2,"color":"rep_light",
+         "notes":"Tariff regime introduced 2025. Fed held rates. Debt trajectory steep. Iran War impact on oil prices Q1 2026."},
+        {"president":"Biden","years":"2021–2025","gdp":"2.1%","inflation":"4.9% avg (peak 9.1%)","unemployment":"3.9%","debt_start":27.8,"color":"dem_light",
+         "notes":"Post-COVID surge drove record inflation. Fed raised rates 11 times 2022-23. IRA and CHIPS Act passed. Debt rose ~$8T."},
+        {"president":"Trump (1st)","years":"2017–2021","gdp":"2.5%","inflation":"1.9%","unemployment":"3.5% (pre-COVID)","debt_start":19.9,"color":"rep_light",
+         "notes":"Tax Cuts and Jobs Act 2017 added ~$1.9T to deficit. COVID caused 14.7% unemployment spike Apr 2020. Debt rose ~$8T."},
+        {"president":"Obama","years":"2009–2017","gdp":"2.0%","inflation":"1.5%","unemployment":"5.2%","debt_start":10.6,"color":"dem_light",
+         "notes":"Inherited Great Recession. Recovery Act ($787B stimulus). Unemployment peaked at 10% Oct 2009. Longest expansion on record began Jun 2009."},
+        {"president":"W. Bush","years":"2001–2009","gdp":"2.1%","inflation":"2.8%","unemployment":"5.3%","debt_start":5.7,"color":"rep_light",
+         "notes":"9/11 caused recession. Bush tax cuts 2001/2003. Great Recession 2008 worst since Great Depression. TARP $700B bailout."},
+        {"president":"Clinton","years":"1993–2001","gdp":"3.9%","inflation":"2.6%","unemployment":"4.0%","debt_start":4.4,"color":"dem_light",
+         "notes":"Longest peacetime economic expansion. Budget surpluses 1998-2001. NAFTA 1994. Dot-com bubble peaked 2000."},
+        {"president":"H.W. Bush","years":"1989–1993","gdp":"2.1%","inflation":"4.2%","unemployment":"6.3%","debt_start":2.9,"color":"rep_light",
+         "notes":"Savings & Loan crisis cost ~$160B. Recession 1990-91. 'No new taxes' pledge broken. Gulf War oil shock."},
+        {"president":"Reagan","years":"1981–1989","gdp":"3.5%","inflation":"5.5%","unemployment":"7.5%","debt_start":1.0,"color":"rep_light",
+         "notes":"Stagflation ended by Fed's Volcker shock (rates hit 20%). Reaganomics/supply-side tax cuts. Debt tripled from $1T to $2.9T."},
+    ]
+}
+
+class EconomyPanel(ctk.CTkFrame):
+    def __init__(self, master, **kw):
+        super().__init__(master, fg_color="transparent", **kw)
+        self._build()
+
+    def _build(self):
+        cur = ECON_DATA["current"]
+
+        hdr = ctk.CTkFrame(self, fg_color="transparent")
+        hdr.pack(fill="x", padx=40, pady=(32,4))
+        tr(ctk.CTkLabel(hdr, text="U.S. Economic Dashboard",
+                     font=("Georgia",24,"bold"), text_color=PALETTE["text_primary"], anchor="w"),
+           text_color="text_primary").pack(side="left")
+        tr(ctk.CTkLabel(hdr, text=f"  as of {cur['as_of']}",
+                     font=("Courier New",10), text_color=PALETTE["text_dim"]),
+           text_color="text_dim").pack(side="left", pady=(8,0))
+
+        tr(ctk.CTkLabel(self, text="Current indicators, presidential economic records, and historical context.",
+                     font=("Courier New",11), text_color=PALETTE["text_secondary"], anchor="w"),
+           text_color="text_secondary").pack(fill="x", padx=40, pady=(0,16))
+
+        # ── Live indicator cards ──────────────────────────────────────────
+        irow = ctk.CTkFrame(self, fg_color="transparent")
+        irow.pack(fill="x", padx=40, pady=(0,20))
+        indicators = [
+            ("GDP GROWTH", cur["gdp_growth"], "positive"),
+            ("INFLATION (CPI)", cur["inflation"], "warning"),
+            ("UNEMPLOYMENT", cur["unemployment"], "text_secondary"),
+            ("FED FUNDS RATE", cur["fed_rate"], "accent"),
+            ("S&P 500", cur["sp500"], "positive"),
+            ("NATIONAL DEBT", f"${cur['debt_trillion']}T", "danger"),
+        ]
+        for i,(label,val,col) in enumerate(indicators):
+            card = ctk.CTkFrame(irow, fg_color=PALETTE["surface"], corner_radius=8,
+                                 border_width=1, border_color=PALETTE["border"])
+            card.grid(row=0, column=i, padx=(0,10) if i<5 else 0, sticky="nsew")
+            irow.grid_columnconfigure(i, weight=1)
+            tr(card, fg_color="surface", border_color="border")
+            tr(ctk.CTkLabel(card, text=label, font=("Courier New",8,"bold"),
+                         text_color=PALETTE["text_dim"]), text_color="text_dim").pack(pady=(12,2))
+            tr(ctk.CTkLabel(card, text=val, font=("Georgia",14,"bold"),
+                         text_color=PALETTE[col]), text_color=col).pack(pady=(0,12))
+
+        # ── Debt clock bar ────────────────────────────────────────────────
+        debt_frame = ctk.CTkFrame(self, fg_color=PALETTE["surface_2"],
+                                   corner_radius=8, border_width=1, border_color=PALETTE["border"])
+        debt_frame.pack(fill="x", padx=40, pady=(0,16))
+        tr(debt_frame, fg_color="surface_2", border_color="border")
+        debt_inner = ctk.CTkFrame(debt_frame, fg_color="transparent")
+        debt_inner.pack(fill="x", padx=16, pady=10)
+        tr(ctk.CTkLabel(debt_inner, text="⚠  National Debt Clock: ",
+                     font=("Courier New",10,"bold"), text_color=PALETTE["warning"]),
+           text_color="warning").pack(side="left")
+        tr(ctk.CTkLabel(debt_inner,
+                     text=f"$36.2 Trillion USD  •  ~$107,000 per citizen  •  ~130% of GDP",
+                     font=("Courier New",10), text_color=PALETTE["text_secondary"]),
+           text_color="text_secondary").pack(side="left")
+
+        # ── Per-president era cards ───────────────────────────────────────
+        tr(ctk.CTkLabel(self, text="ECONOMIC RECORD BY ADMINISTRATION",
+                     font=("Courier New",9,"bold"), text_color=PALETTE["text_dim"], anchor="w"),
+           text_color="text_dim").pack(fill="x", padx=40, pady=(0,8))
+
+        scroll = ctk.CTkScrollableFrame(self, fg_color="transparent",
+            scrollbar_button_color=PALETTE["border"])
+        scroll.pack(fill="both", expand=True, padx=40, pady=(0,32))
+
+        for era in ECON_DATA["eras"]:
+            ec = PALETTE.get(era["color"], PALETTE["accent"])
+            card = ctk.CTkFrame(scroll, fg_color=PALETTE["surface"], corner_radius=10,
+                                 border_width=1, border_color=PALETTE["border"])
+            card.pack(fill="x", pady=(0,10))
+            tr(card, fg_color="surface", border_color="border")
+            stripe = ctk.CTkFrame(card, width=4, fg_color=ec, corner_radius=0)
+            stripe.place(x=0,y=0,relheight=1)
+
+            row = ctk.CTkFrame(card, fg_color="transparent")
+            row.pack(fill="x", padx=20, pady=14)
+            row.columnconfigure(0,weight=2)
+            row.columnconfigure(1,weight=1)
+            row.columnconfigure(2,weight=1)
+            row.columnconfigure(3,weight=1)
+            row.columnconfigure(4,weight=3)
+
+            ctk.CTkLabel(row, text=f"{era['president']}  ({era['years']})",
+                         font=("Georgia",13,"bold"), text_color=ec, anchor="w"
+                         ).grid(row=0,column=0,sticky="w")
+            for col_i,(lbl,val) in enumerate([
+                ("GDP Growth",era["gdp"]),
+                ("Inflation",era["inflation"]),
+                ("Unemployment",era["unemployment"]),
+            ]):
+                ctk.CTkLabel(row, text=lbl, font=("Courier New",8,"bold"),
+                             text_color=PALETTE["text_dim"], anchor="w"
+                             ).grid(row=0,column=col_i+1,sticky="w",padx=(10,0))
+                ctk.CTkLabel(row, text=val, font=("Courier New",10),
+                             text_color=PALETTE["text_primary"], anchor="w"
+                             ).grid(row=1,column=col_i+1,sticky="w",padx=(10,0))
+            ctk.CTkLabel(row, text=era["notes"], font=("Courier New",10),
+                         text_color=PALETTE["text_secondary"],
+                         wraplength=340, justify="left", anchor="w"
+                         ).grid(row=0,column=4,rowspan=2,sticky="w",padx=(16,0))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  CONGRESS TRACKER PANEL
+# ══════════════════════════════════════════════════════════════════════════════
+
+CONGRESS_DATA = {
+    "session": "119th Congress (2025–2027)",
+    "senate": {"R": 53, "D": 45, "I": 2, "majority": "Republican", "leader_R": "John Thune (SD)", "leader_D": "Chuck Schumer (NY)"},
+    "house":  {"R": 220, "D": 215, "majority": "Republican", "speaker": "Mike Johnson (LA)", "minority_leader": "Hakeem Jeffries (NY)"},
+    "recent_bills": [
+        {"name":"Laken Riley Act","status":"SIGNED","date":"Jan 29, 2025","party":"R","summary":"Required detention of undocumented immigrants charged with violent crimes. First bill signed by Trump in 2nd term."},
+        {"name":"No Tax on Tips Act","status":"PASSED SENATE","date":"May 2025","party":"R","summary":"Exempted tip income from federal income tax. Fulfillment of Trump campaign promise. House version pending."},
+        {"name":"GENIUS Act","status":"PASSED SENATE","date":"May 2025","party":"B","summary":"Stablecoin regulation framework — first major federal crypto legislation. Bipartisan support."},
+        {"name":"Big Beautiful Bill (Reconciliation)","status":"PASSED HOUSE","date":"May 2025","party":"R","summary":"Sweeping tax and spending package. Extended 2017 tax cuts, increased defense/border spending, cut Medicaid. Senate negotiations ongoing."},
+        {"name":"DHS Appropriations FY2026","status":"BLOCKED","date":"Feb 2026","party":"B","summary":"Funding bill for DHS. Senate Democrats blocked over CBP conduct concerns following Alex Pretti killing. Triggered partial shutdown."},
+        {"name":"Continuing Resolution (Feb 2026)","status":"SIGNED","date":"Feb 3, 2026","party":"B","summary":"Ended 4-day shutdown. Short-term spending extension passed with bipartisan support."},
+    ],
+    "historical": [
+        {"year":"118th (2023–25)","senate":"D 48 + 3I","house":"R 222 / D 213","notes":"Divided Congress. Speaker McCarthy ousted Oct 2023 — first ever. Mike Johnson elected. Slim margins paralyzed legislation."},
+        {"year":"117th (2021–23)","senate":"D 50 + 2I (tie-break VP)","house":"D 222 / R 213","notes":"Democrats held both chambers. IRA, IIJA, CHIPS Act passed. Narrowest Senate majority required every Democratic vote."},
+        {"year":"116th (2019–21)","senate":"R 53 / D 45","house":"D 235 / R 200","notes":"Divided Congress. Trump impeached twice. COVID relief packages passed. ACA repeal failed in Senate."},
+        {"year":"115th (2017–19)","senate":"R 51 / D 47","house":"R 241 / D 194","notes":"Republican trifecta. Tax Cuts and Jobs Act 2017. ACA repeal failed (McCain's thumb-down vote). Democrats flipped House in 2018 midterms."},
+    ]
+}
+
+class CongressPanel(ctk.CTkFrame):
+    def __init__(self, master, **kw):
+        super().__init__(master, fg_color="transparent", **kw)
+        self._build()
+
+    def _build(self):
+        cd = CONGRESS_DATA
+        hdr = ctk.CTkFrame(self, fg_color="transparent")
+        hdr.pack(fill="x", padx=40, pady=(32,4))
+        tr(ctk.CTkLabel(hdr, text="Congress Tracker",
+                     font=("Georgia",24,"bold"), text_color=PALETTE["text_primary"], anchor="w"),
+           text_color="text_primary").pack(side="left")
+        badge = ctk.CTkFrame(hdr, fg_color=PALETTE["surface_2"], corner_radius=4,
+                              border_width=1, border_color=PALETTE["border"])
+        badge.pack(side="right", pady=6)
+        tr(badge, fg_color="surface_2", border_color="border")
+        ctk.CTkLabel(badge, text=f"  {cd['session']}  ",
+                     font=("Courier New",9,"bold"), text_color=PALETTE["accent"]).pack(pady=4)
+
+        tr(ctk.CTkLabel(self,
+                     text="Current Senate/House composition, recent legislation, and historical Congress breakdown.",
+                     font=("Courier New",11), text_color=PALETTE["text_secondary"], anchor="w"),
+           text_color="text_secondary").pack(fill="x", padx=40, pady=(0,16))
+
+        scroll = ctk.CTkScrollableFrame(self, fg_color="transparent",
+            scrollbar_button_color=PALETTE["border"])
+        scroll.pack(fill="both", expand=True, padx=40, pady=(0,32))
+
+        # ── Chamber cards ─────────────────────────────────────────────────
+        chambers = ctk.CTkFrame(scroll, fg_color="transparent")
+        chambers.pack(fill="x", pady=(0,16))
+        chambers.columnconfigure(0, weight=1)
+        chambers.columnconfigure(1, weight=1)
+
+        for col_i, (chamber_name, data) in enumerate([("SENATE (100 seats)", cd["senate"]),
+                                                       ("HOUSE (435 seats)", cd["house"])]):
+            card = ctk.CTkFrame(chambers, fg_color=PALETTE["surface"], corner_radius=10,
+                                 border_width=1, border_color=PALETTE["border"])
+            card.grid(row=0, column=col_i, padx=(0,8) if col_i==0 else (8,0), sticky="nsew")
+            tr(card, fg_color="surface", border_color="border")
+
+            tr(ctk.CTkLabel(card, text=chamber_name, font=("Courier New",9,"bold"),
+                         text_color=PALETTE["text_dim"], anchor="w"),
+               text_color="text_dim").pack(fill="x", padx=16, pady=(14,8))
+
+            # Seat bar
+            total = 100 if "senate" in chamber_name.lower() else 435
+            r_seats = data["R"]; d_seats = data["D"]
+            bar_bg = ctk.CTkFrame(card, height=14, fg_color=PALETTE["dem_light"], corner_radius=4)
+            bar_bg.pack(fill="x", padx=16, pady=(0,8))
+            ctk.CTkFrame(bar_bg, height=14, fg_color=PALETTE["rep_light"], corner_radius=4
+                         ).place(relx=1.0, rely=0, relwidth=r_seats/total, relheight=1, anchor="ne")
+
+            # Counts
+            count_row = ctk.CTkFrame(card, fg_color="transparent")
+            count_row.pack(fill="x", padx=16, pady=(0,8))
+            ctk.CTkLabel(count_row, text=f"🔵 D: {d_seats}",
+                         font=("Courier New",11,"bold"), text_color=PALETTE["dem_light"]).pack(side="left")
+            ctk.CTkLabel(count_row, text=f"  🔴 R: {r_seats}",
+                         font=("Courier New",11,"bold"), text_color=PALETTE["rep_light"]).pack(side="left")
+            if "I" in data:
+                ctk.CTkLabel(count_row, text=f"  ⚪ I: {data['I']}",
+                             font=("Courier New",11,"bold"), text_color=PALETTE["text_dim"]).pack(side="left")
+
+            maj_color = PALETTE["rep_light"] if data["majority"]=="Republican" else PALETTE["dem_light"]
+            tr(ctk.CTkLabel(card, text=f"Majority: {data['majority']}",
+                         font=("Courier New",10,"bold"), text_color=maj_color, anchor="w"),
+               text_color="rep_light" if data["majority"]=="Republican" else "dem_light"
+               ).pack(fill="x", padx=16, pady=(0,4))
+
+            if "speaker" in data:
+                ctk.CTkLabel(card, text=f"Speaker: {data['speaker']}",
+                             font=("Courier New",10), text_color=PALETTE["text_secondary"],
+                             anchor="w").pack(fill="x", padx=16)
+                ctk.CTkLabel(card, text=f"Minority Leader: {data['minority_leader']}",
+                             font=("Courier New",10), text_color=PALETTE["text_secondary"],
+                             anchor="w").pack(fill="x", padx=16, pady=(0,14))
+            else:
+                ctk.CTkLabel(card, text=f"Majority Leader: {data['leader_R']}",
+                             font=("Courier New",10), text_color=PALETTE["text_secondary"],
+                             anchor="w").pack(fill="x", padx=16)
+                ctk.CTkLabel(card, text=f"Minority Leader: {data['leader_D']}",
+                             font=("Courier New",10), text_color=PALETTE["text_secondary"],
+                             anchor="w").pack(fill="x", padx=16, pady=(0,14))
+
+        # ── Recent bills ──────────────────────────────────────────────────
+        tr(ctk.CTkLabel(scroll, text="RECENT LEGISLATION",
+                     font=("Courier New",9,"bold"), text_color=PALETTE["text_dim"], anchor="w"),
+           text_color="text_dim").pack(fill="x", pady=(8,8))
+
+        STATUS_COLORS = {"SIGNED":"positive","PASSED SENATE":"accent","PASSED HOUSE":"accent",
+                         "BLOCKED":"danger","VETOED":"danger","PENDING":"text_secondary"}
+        for bill in cd["recent_bills"]:
+            sc = PALETTE.get(STATUS_COLORS.get(bill["status"],"text_secondary"), PALETTE["text_secondary"])
+            pc = PALETTE["rep_light"] if bill["party"]=="R" else PALETTE["dem_light"] if bill["party"]=="D" else PALETTE["accent"]
+            bc = ctk.CTkFrame(scroll, fg_color=PALETTE["surface"], corner_radius=8,
+                               border_width=1, border_color=PALETTE["border"])
+            bc.pack(fill="x", pady=(0,8))
+            tr(bc, fg_color="surface", border_color="border")
+            stripe = ctk.CTkFrame(bc, width=4, fg_color=pc, corner_radius=0)
+            stripe.place(x=0,y=0,relheight=1)
+            brow = ctk.CTkFrame(bc, fg_color="transparent")
+            brow.pack(fill="x", padx=16, pady=10)
+            ctk.CTkLabel(brow, text=bill["name"], font=("Georgia",12,"bold"),
+                         text_color=PALETTE["text_primary"], anchor="w").pack(side="left")
+            stat_b = ctk.CTkFrame(brow, fg_color=PALETTE["surface_2"], corner_radius=4)
+            stat_b.pack(side="right")
+            tr(stat_b, fg_color="surface_2")
+            ctk.CTkLabel(stat_b, text=bill["status"], font=("Courier New",9,"bold"),
+                         text_color=sc).pack(padx=8,pady=3)
+            ctk.CTkLabel(bc, text=f"{bill['date']}  —  {bill['summary']}",
+                         font=("Courier New",10), text_color=PALETTE["text_secondary"],
+                         wraplength=820, justify="left", anchor="w").pack(fill="x", padx=16, pady=(0,10))
+
+        # ── Historical breakdown ──────────────────────────────────────────
+        tr(ctk.CTkLabel(scroll, text="HISTORICAL COMPOSITION",
+                     font=("Courier New",9,"bold"), text_color=PALETTE["text_dim"], anchor="w"),
+           text_color="text_dim").pack(fill="x", pady=(12,8))
+        for h in cd["historical"]:
+            hc = ctk.CTkFrame(scroll, fg_color=PALETTE["surface_2"], corner_radius=6,
+                               border_width=1, border_color=PALETTE["border"])
+            hc.pack(fill="x", pady=(0,6))
+            tr(hc, fg_color="surface_2", border_color="border")
+            ctk.CTkLabel(hc, text=h["year"], font=("Courier New",10,"bold"),
+                         text_color=PALETTE["accent"], anchor="w").pack(fill="x",padx=14,pady=(10,2))
+            ctk.CTkLabel(hc, text=f"Senate: {h['senate']}  |  House: {h['house']}",
+                         font=("Courier New",10), text_color=PALETTE["text_secondary"],
+                         anchor="w").pack(fill="x",padx=14,pady=(0,2))
+            ctk.CTkLabel(hc, text=h["notes"], font=("Courier New",10),
+                         text_color=PALETTE["text_dim"], wraplength=820,
+                         justify="left", anchor="w").pack(fill="x",padx=14,pady=(0,10))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SUPREME COURT TRACKER PANEL
+# ══════════════════════════════════════════════════════════════════════════════
+
+SCOTUS_DATA = {
+    "justices": [
+        {"name":"John Roberts","title":"Chief Justice","appointed_by":"G.W. Bush","year":2005,"leaning":"Conservative","age":70},
+        {"name":"Clarence Thomas","title":"Associate Justice","appointed_by":"G.H.W. Bush","year":1991,"leaning":"Conservative","age":76},
+        {"name":"Samuel Alito","title":"Associate Justice","appointed_by":"G.W. Bush","year":2006,"leaning":"Conservative","age":74},
+        {"name":"Sonia Sotomayor","title":"Associate Justice","appointed_by":"Obama","year":2009,"leaning":"Liberal","age":70},
+        {"name":"Elena Kagan","title":"Associate Justice","appointed_by":"Obama","year":2010,"leaning":"Liberal","age":64},
+        {"name":"Neil Gorsuch","title":"Associate Justice","appointed_by":"Trump","year":2017,"leaning":"Conservative","age":57},
+        {"name":"Brett Kavanaugh","title":"Associate Justice","appointed_by":"Trump","year":2018,"leaning":"Conservative","age":59},
+        {"name":"Amy Coney Barrett","title":"Associate Justice","appointed_by":"Trump","year":2020,"leaning":"Conservative","age":52},
+        {"name":"Ketanji Brown Jackson","title":"Associate Justice","appointed_by":"Biden","year":2022,"leaning":"Liberal","age":54},
+    ],
+    "landmark_rulings": [
+        {"case":"Trump v. United States (2024)","ruling":"Broad presidential immunity for official acts","vote":"6-3","impact":"Major","leaning":"Conservative",
+         "summary":"Ruled presidents have broad immunity from criminal prosecution for official acts. Landmark separation of powers decision with sweeping implications."},
+        {"case":"Dobbs v. Jackson (2022)","ruling":"Roe v. Wade overturned; abortion returned to states","vote":"6-3","impact":"Major","leaning":"Conservative",
+         "summary":"Overturned Roe v. Wade (1973) and Planned Parenthood v. Casey (1992). Eliminated federal constitutional right to abortion after ~50 years."},
+        {"case":"NYSRPA v. Bruen (2022)","ruling":"Expanded Second Amendment rights to public carry","vote":"6-3","impact":"Major","leaning":"Conservative",
+         "summary":"Struck down NY's concealed carry permit law. Established new 'historical tradition' test for gun regulations."},
+        {"case":"Biden v. Nebraska (2023)","ruling":"Blocked $400B student loan forgiveness","vote":"6-3","impact":"Major","leaning":"Conservative",
+         "summary":"Invoked 'major questions doctrine' to block Biden's mass student loan cancellation. Significant limit on executive agency power."},
+        {"case":"303 Creative v. Elenis (2023)","ruling":"Web designer can refuse same-sex wedding sites","vote":"6-3","impact":"Moderate","leaning":"Conservative",
+         "summary":"First Amendment protects business owners who refuse services for same-sex weddings if expressive/creative. Tension with LGBTQ+ anti-discrimination laws."},
+        {"case":"Obergefell v. Hodges (2015)","ruling":"Same-sex marriage is a constitutional right","vote":"5-4","impact":"Major","leaning":"Liberal",
+         "summary":"Landmark ruling guaranteeing same-sex couples the right to marry under the 14th Amendment. Required all states to license and recognize same-sex marriages."},
+        {"case":"Shelby County v. Holder (2013)","ruling":"Gutted Voting Rights Act Section 4(b)","vote":"5-4","impact":"Major","leaning":"Conservative",
+         "summary":"Invalidated formula used to determine which jurisdictions required federal pre-clearance for voting law changes. Effectively ended key VRA enforcement mechanism."},
+        {"case":"Citizens United v. FEC (2010)","ruling":"Corporations have free speech rights in elections","vote":"5-4","impact":"Major","leaning":"Conservative",
+         "summary":"Struck down limits on independent political expenditures by corporations and other groups. Led to the rise of Super PACs and transformed campaign finance."},
+        {"case":"District of Columbia v. Heller (2008)","ruling":"Second Amendment protects individual gun ownership","vote":"5-4","impact":"Major","leaning":"Conservative",
+         "summary":"First ruling explicitly recognizing individual right to keep firearms for self-defense at home. Struck down DC's handgun ban."},
+        {"case":"Bush v. Gore (2000)","ruling":"Stopped Florida recount; decided 2000 election","vote":"5-4","impact":"Major","leaning":"Conservative",
+         "summary":"Halted the Florida presidential recount, effectively deciding the 2000 election for George W. Bush. Per curiam opinion explicitly limited to the specific facts."},
+    ]
+}
+
+class ScotusPanel(ctk.CTkFrame):
+    def __init__(self, master, **kw):
+        super().__init__(master, fg_color="transparent", **kw)
+        self._build()
+
+    def _build(self):
+        hdr = ctk.CTkFrame(self, fg_color="transparent")
+        hdr.pack(fill="x", padx=40, pady=(32,4))
+        tr(ctk.CTkLabel(hdr, text="Supreme Court Tracker",
+                     font=("Georgia",24,"bold"), text_color=PALETTE["text_primary"], anchor="w"),
+           text_color="text_primary").pack(side="left")
+        cons = sum(1 for j in SCOTUS_DATA["justices"] if j["leaning"]=="Conservative")
+        lib  = len(SCOTUS_DATA["justices"]) - cons
+        badge = ctk.CTkFrame(hdr, fg_color=PALETTE["surface_2"], corner_radius=4,
+                              border_width=1, border_color=PALETTE["border"])
+        badge.pack(side="right", pady=6)
+        tr(badge, fg_color="surface_2", border_color="border")
+        ctk.CTkLabel(badge, text=f"  🔴 Conservative: {cons}  |  🔵 Liberal: {lib}  ",
+                     font=("Courier New",9,"bold"), text_color=PALETTE["text_dim"]).pack(pady=4)
+
+        tr(ctk.CTkLabel(self, text="Current justices, ideological composition, and landmark rulings.",
+                     font=("Courier New",11), text_color=PALETTE["text_secondary"], anchor="w"),
+           text_color="text_secondary").pack(fill="x", padx=40, pady=(0,16))
+
+        scroll = ctk.CTkScrollableFrame(self, fg_color="transparent",
+            scrollbar_button_color=PALETTE["border"])
+        scroll.pack(fill="both", expand=True, padx=40, pady=(0,32))
+
+        # ── Justices grid ─────────────────────────────────────────────────
+        tr(ctk.CTkLabel(scroll, text="CURRENT JUSTICES",
+                     font=("Courier New",9,"bold"), text_color=PALETTE["text_dim"], anchor="w"),
+           text_color="text_dim").pack(fill="x", pady=(0,10))
+
+        jgrid = ctk.CTkFrame(scroll, fg_color="transparent")
+        jgrid.pack(fill="x", pady=(0,20))
+        for col_i in range(3):
+            jgrid.columnconfigure(col_i, weight=1)
+
+        for i, j in enumerate(SCOTUS_DATA["justices"]):
+            jc = PALETTE["rep_light"] if j["leaning"]=="Conservative" else PALETTE["dem_light"]
+            col_i = i % 3
+            row_i = i // 3
+            card = ctk.CTkFrame(jgrid, fg_color=PALETTE["surface"], corner_radius=8,
+                                 border_width=1, border_color=jc)
+            card.grid(row=row_i, column=col_i, padx=4, pady=4, sticky="nsew")
+            tr(card, fg_color="surface")
+            stripe = ctk.CTkFrame(card, height=3, fg_color=jc, corner_radius=0)
+            stripe.pack(fill="x")
+            ctk.CTkLabel(card, text=j["name"], font=("Georgia",12,"bold"),
+                         text_color=jc, anchor="w").pack(fill="x",padx=12,pady=(10,2))
+            ctk.CTkLabel(card, text=j["title"], font=("Courier New",9),
+                         text_color=PALETTE["text_dim"], anchor="w").pack(fill="x",padx=12)
+            ctk.CTkLabel(card, text=f"Appt: {j['appointed_by']} ({j['year']})  •  Age: {j['age']}",
+                         font=("Courier New",9), text_color=PALETTE["text_secondary"],
+                         anchor="w").pack(fill="x",padx=12,pady=(2,10))
+
+        # ── Landmark rulings ──────────────────────────────────────────────
+        tr(ctk.CTkLabel(scroll, text="LANDMARK RULINGS",
+                     font=("Courier New",9,"bold"), text_color=PALETTE["text_dim"], anchor="w"),
+           text_color="text_dim").pack(fill="x", pady=(8,10))
+
+        for r in SCOTUS_DATA["landmark_rulings"]:
+            rc = PALETTE["rep_light"] if r["leaning"]=="Conservative" else PALETTE["dem_light"]
+            imp_color = PALETTE["danger"] if r["impact"]=="Major" else PALETTE["warning"]
+            card = ctk.CTkFrame(scroll, fg_color=PALETTE["surface"], corner_radius=10,
+                                 border_width=1, border_color=PALETTE["border"])
+            card.pack(fill="x", pady=(0,10))
+            tr(card, fg_color="surface", border_color="border")
+            stripe = ctk.CTkFrame(card, width=4, fg_color=rc, corner_radius=0)
+            stripe.place(x=0,y=0,relheight=1)
+            top_row = ctk.CTkFrame(card, fg_color="transparent")
+            top_row.pack(fill="x",padx=16,pady=(12,4))
+            ctk.CTkLabel(top_row, text=r["case"], font=("Georgia",13,"bold"),
+                         text_color=PALETTE["text_primary"], anchor="w").pack(side="left")
+            vote_b = ctk.CTkFrame(top_row, fg_color=PALETTE["surface_2"], corner_radius=4)
+            vote_b.pack(side="right", padx=(4,0))
+            tr(vote_b, fg_color="surface_2")
+            ctk.CTkLabel(vote_b, text=f"{r['vote']}  {r['impact']}",
+                         font=("Courier New",9,"bold"), text_color=imp_color).pack(padx=8,pady=3)
+            ctk.CTkLabel(card, text=r["ruling"], font=("Courier New",10,"bold"),
+                         text_color=rc, anchor="w").pack(fill="x",padx=16,pady=(0,4))
+            ctk.CTkLabel(card, text=r["summary"], font=("Courier New",10),
+                         text_color=PALETTE["text_secondary"], wraplength=840,
+                         justify="left", anchor="w").pack(fill="x",padx=16,pady=(0,12))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  GLOBAL SEARCH PANEL
+# ══════════════════════════════════════════════════════════════════════════════
+
+class GlobalSearchPanel(ctk.CTkFrame):
+    """Searches across events, presidents, wars, elections, SCOTUS rulings, congress bills."""
+
+    SOURCES = []  # populated after all data is defined
+
+    def __init__(self, master, **kw):
+        super().__init__(master, fg_color="transparent", **kw)
+        self._build()
+
+    def _build(self):
+        hdr_row = ctk.CTkFrame(self, fg_color="transparent")
+        hdr_row.pack(fill="x", padx=40, pady=(32,4))
+        tr(ctk.CTkLabel(hdr_row, text="Global Search",
+                     font=("Georgia",24,"bold"), text_color=PALETTE["text_primary"], anchor="w"),
+           text_color="text_primary").pack(side="left")
+        tr(ctk.CTkLabel(hdr_row,
+                     text="  Searches events, presidents, wars, elections, SCOTUS & Congress",
+                     font=("Courier New",10), text_color=PALETTE["text_dim"]),
+           text_color="text_dim").pack(side="left", pady=(8,0))
+
+        # Search bar
+        bar = ctk.CTkFrame(self, fg_color=PALETTE["surface"], corner_radius=10,
+                            border_width=1, border_color=PALETTE["accent"])
+        bar.pack(fill="x", padx=40, pady=(4,16))
+        tr(bar, fg_color="surface", border_color="accent")
+
+        self._entry = ctk.CTkEntry(bar,
+            placeholder_text="Type to search everything — press Enter or click Search...",
+            placeholder_text_color=PALETTE["text_dim"],
+            fg_color="transparent", border_width=0,
+            text_color=PALETTE["text_primary"], font=("Georgia",14))
+        self._entry.pack(side="left", fill="x", expand=True, padx=16, pady=12)
+        self._entry.bind("<Return>", lambda e: self._search())
+        tr(self._entry, text_color="text_primary")
+
+        ctk.CTkButton(bar, text="Search", width=100, height=36, corner_radius=8,
+            fg_color=PALETTE["accent"], hover_color=PALETTE["accent_dim"],
+            text_color=PALETTE["bg"], font=("Courier New",11,"bold"),
+            command=self._search).pack(side="right", padx=12, pady=8)
+
+        self._count_lbl = tr(ctk.CTkLabel(self, text="",
+                     font=("Courier New",10), text_color=PALETTE["text_dim"], anchor="w"),
+                     text_color="text_dim")
+        self._count_lbl.pack(fill="x", padx=40, pady=(0,8))
+
+        self._scroll = ctk.CTkScrollableFrame(self, fg_color="transparent",
+            scrollbar_button_color=PALETTE["border"])
+        self._scroll.pack(fill="both", expand=True, padx=40, pady=(0,32))
+
+        # Build searchable corpus once
+        self._corpus = self._build_corpus()
+
+    def _build_corpus(self):
+        items = []
+        # Dashboard events
+        for date, cat, headline, detail, _ in DashboardPanel.EVENTS:
+            items.append({"tab":"Dashboard","label":headline,
+                          "meta":f"{cat}  •  {date}","detail":detail,"color":"accent"})
+        # Wars
+        for w in WARS_DATA:
+            items.append({"tab":"US Wars","label":w["name"],
+                          "meta":f"{w['years']}  •  Deaths: {w['us_deaths']}",
+                          "detail":w["summary"],"color":"danger" if w["status"]=="ongoing" else "text_secondary"})
+        # Gov history presidents
+        for era in GOV_ERAS:
+            for p in era["presidents"]:
+                items.append({"tab":"Gov. History","label":p["name"],
+                              "meta":f"{p['party']}  •  {p['years']}",
+                              "detail":"  |  ".join(p["key_facts"][:2]),"color":"accent"})
+        # Elections
+        for e in ELECTION_DATA:
+            items.append({"tab":"Elections","label":f"{e['year']}: {e['winner']} vs {e['loser']}",
+                          "meta":f"EV {e['ev_winner']}–{e['ev_loser']}  •  PV margin {e['margin_pv']:+.1f}%",
+                          "detail":e["notes"],"color":"rep_light" if e["winner_party"]=="R" else "dem_light"})
+        # Economy eras
+        for era in ECON_DATA["eras"]:
+            items.append({"tab":"Economy","label":era["president"],
+                          "meta":f"{era['years']}  •  GDP: {era['gdp']}  Inflation: {era['inflation']}",
+                          "detail":era["notes"],"color":era["color"]})
+        # Congress bills
+        for b in CONGRESS_DATA["recent_bills"]:
+            items.append({"tab":"Congress","label":b["name"],
+                          "meta":f"{b['status']}  •  {b['date']}",
+                          "detail":b["summary"],"color":"positive" if b["status"]=="SIGNED" else "accent"})
+        # SCOTUS
+        for r in SCOTUS_DATA["landmark_rulings"]:
+            items.append({"tab":"Supreme Court","label":r["case"],
+                          "meta":f"{r['vote']} vote  •  {r['impact']} impact",
+                          "detail":r["summary"],"color":"rep_light" if r["leaning"]=="Conservative" else "dem_light"})
+        for j in SCOTUS_DATA["justices"]:
+            items.append({"tab":"Supreme Court","label":j["name"],
+                          "meta":f"{j['leaning']}  •  Appt: {j['appointed_by']} {j['year']}",
+                          "detail":j["title"],"color":"rep_light" if j["leaning"]=="Conservative" else "dem_light"})
+        return items
+
+    def _search(self):
+        q = self._entry.get().strip().lower()
+        for w in self._scroll.winfo_children():
+            w.destroy()
+
+        if not q:
+            self._count_lbl.configure(text="Type a query above and press Enter.")
+            return
+
+        results = [item for item in self._corpus
+                   if q in item["label"].lower() or q in item["detail"].lower()
+                   or q in item["meta"].lower()]
+
+        self._count_lbl.configure(text=f"  {len(results)} result{'s' if len(results)!=1 else ''} for \"{q}\"")
+
+        if not results:
+            tr(ctk.CTkLabel(self._scroll,
+                         text="No results found. Try different keywords.",
+                         font=("Courier New",12), text_color=PALETTE["text_dim"]),
+               text_color="text_dim").pack(pady=40)
+            return
+
+        for item in results:
+            color = PALETTE.get(item["color"], PALETTE["accent"])
+            card = ctk.CTkFrame(self._scroll, fg_color=PALETTE["surface"],
+                                 corner_radius=8, border_width=1,
+                                 border_color=PALETTE["border"])
+            card.pack(fill="x", pady=(0,8))
+            tr(card, fg_color="surface", border_color="border")
+            stripe = ctk.CTkFrame(card, width=4, fg_color=color, corner_radius=0)
+            stripe.place(x=0,y=0,relheight=1)
+
+            top = ctk.CTkFrame(card, fg_color="transparent")
+            top.pack(fill="x", padx=16, pady=(10,2))
+            ctk.CTkLabel(top, text=item["label"], font=("Georgia",12,"bold"),
+                         text_color=PALETTE["text_primary"], anchor="w").pack(side="left")
+            tab_badge = ctk.CTkFrame(top, fg_color=PALETTE["surface_2"], corner_radius=4)
+            tab_badge.pack(side="right")
+            tr(tab_badge, fg_color="surface_2")
+            ctk.CTkLabel(tab_badge, text=item["tab"], font=("Courier New",8,"bold"),
+                         text_color=color).pack(padx=6,pady=2)
+
+            ctk.CTkLabel(card, text=item["meta"], font=("Courier New",9),
+                         text_color=PALETTE["text_dim"], anchor="w").pack(fill="x",padx=16,pady=(0,2))
+            ctk.CTkLabel(card, text=item["detail"], font=("Courier New",10),
+                         text_color=PALETTE["text_secondary"], wraplength=860,
+                         justify="left", anchor="w").pack(fill="x",padx=16,pady=(0,10))
+
+
 class SettingsPanel(ctk.CTkFrame):
     def __init__(self, master, on_theme_change, **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
@@ -2832,6 +3580,11 @@ class ExecutiveInsight(ctk.CTk):
             "Party Impact": PartyImpactPanel(self.content_area),
             "US Wars":      USWarsPanel(self.content_area),
             "Gov. History": GovHistoryPanel(self.content_area),
+            "Elections":    ElectionHistoryPanel(self.content_area),
+            "Economy":      EconomyPanel(self.content_area),
+            "Congress":     CongressPanel(self.content_area),
+            "Supreme Court":ScotusPanel(self.content_area),
+            "Search":       GlobalSearchPanel(self.content_area),
             "Settings":     SettingsPanel(self.content_area, on_theme_change=self._apply_theme),
         }
 
