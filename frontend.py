@@ -128,33 +128,50 @@ PALETTE = dict(THEMES["Executive Dark"])
 CURRENT_THEME = ["Executive Dark"]  # mutable container so panels can read it
 
 # ── Theme Registry — instant recolour without rebuild ─────────────────────────
-# Each entry: (widget, {ctk_kwarg: palette_key, ...})
-# e.g. (my_label, {"text_color": "accent", "fg_color": "surface"})
-_THEME_REGISTRY: list = []
+import weakref as _weakref
+
+_THEME_REGISTRY: list = []   # [(weakref_callable, {kwarg: palette_key}), ...]
 
 def tr(widget, **palette_kwargs):
     """Register a widget for live theme updates. Returns the widget."""
-    _THEME_REGISTRY.append((widget, palette_kwargs))
+    try:
+        ref = _weakref.ref(widget)
+    except TypeError:
+        ref = lambda: widget  # tk widgets that don't support weakrefs
+    _THEME_REGISTRY.append((ref, palette_kwargs))
     return widget
 
 def apply_theme_to_registry():
-    """Walk registry and push new palette values into every widget."""
-    dead = []
-    for i, (w, kwargs) in enumerate(_THEME_REGISTRY):
-        try:
-            w.winfo_exists()
-        except Exception:
-            dead.append(i)
+    """Walk registry and push new palette values into every live widget."""
+    live = []
+    for wref, kwargs in _THEME_REGISTRY:
+        w = wref()
+        if w is None:
             continue
         try:
             updates = {k: PALETTE[v] for k, v in kwargs.items() if v in PALETTE}
             if updates:
                 w.configure(**updates)
+            live.append((wref, kwargs))
         except Exception:
-            dead.append(i)
-    # Prune dead widgets (reversed so indices stay valid)
-    for i in reversed(dead):
-        _THEME_REGISTRY.pop(i)
+            pass
+    _THEME_REGISTRY[:] = live
+
+
+# ── Debounce helper ───────────────────────────────────────────────────────────
+class _Debouncer:
+    """Delays a call by ms; cancels any pending same-instance call."""
+    def __init__(self, ms):
+        self.ms = ms
+        self._job = None
+
+    def call(self, widget, fn, *args):
+        if self._job:
+            try:
+                widget.after_cancel(self._job)
+            except Exception:
+                pass
+        self._job = widget.after(self.ms, lambda: fn(*args))
 
 # ── Party Data ────────────────────────────────────────────────────────────────
 
@@ -707,8 +724,10 @@ class DashboardPanel(ctk.CTkFrame):
             fg_color="transparent", border_width=0,
             text_color=PALETTE["text_primary"], font=("Georgia", 13))
         self._search_entry.pack(side="left", fill="x", expand=True, padx=16, pady=10)
+        self._search_debouncer = _Debouncer(280)
         self._search_entry.bind("<Return>", lambda e: self._do_search())
-        self._search_entry.bind("<KeyRelease>", lambda e: self._live_search())
+        self._search_entry.bind("<KeyRelease>", lambda e: self._search_debouncer.call(
+            self._search_entry, self._live_search))
         tr(self._search_entry, text_color="text_primary")
 
         ctk.CTkButton(search_bar, text="Search", width=90, height=34,
@@ -743,6 +762,11 @@ class DashboardPanel(ctk.CTkFrame):
 
         # Build corpus for search
         self._corpus = self._build_search_corpus()
+        # Pre-build lowercase index for O(1) search matching
+        self._search_index = [
+            (item, " ".join([item["label"], item["meta"], item["detail"]]).lower())
+            for item in self._corpus
+        ]
         self._search_active = False
 
         # ── Stat cards ────────────────────────────────────────────────────
@@ -883,10 +907,7 @@ class DashboardPanel(ctk.CTkFrame):
             self._clear_search()
             return
 
-        results = [item for item in self._corpus
-                   if q in item["label"].lower()
-                   or q in item["detail"].lower()
-                   or q in item["meta"].lower()]
+        results = [item for item, text in self._search_index if q in text]
 
         # Show search results, hide main content
         self._main_content.pack_forget()
@@ -904,35 +925,41 @@ class DashboardPanel(ctk.CTkFrame):
                          text_color=PALETTE["text_dim"]).pack(pady=40)
             return
 
-        for item in results:
+        # Batch render 20 cards per frame tick — keeps UI responsive while typing
+        BATCH = 20
+        result_count = len(results)
+        inner = self._search_results_inner
+
+        def _make_card(item):
             color = PALETTE.get(item["color"], PALETTE["accent"])
-            card = ctk.CTkFrame(self._search_results_inner,
-                                 fg_color=PALETTE["surface_2"],
+            card = ctk.CTkFrame(inner, fg_color=PALETTE["surface_2"],
                                  corner_radius=8, border_width=1,
                                  border_color=PALETTE["border"])
             card.pack(fill="x", pady=(0, 6))
-            tr(card, fg_color="surface_2", border_color="border")
-
-            stripe = ctk.CTkFrame(card, width=4, fg_color=color, corner_radius=0)
-            stripe.place(x=0, y=0, relheight=1)
-
+            ctk.CTkFrame(card, width=4, fg_color=color, corner_radius=0
+                         ).place(x=0, y=0, relheight=1)
             top = ctk.CTkFrame(card, fg_color="transparent")
             top.pack(fill="x", padx=14, pady=(8, 2))
-
             ctk.CTkLabel(top, text=item["label"], font=("Georgia", 12, "bold"),
                          text_color=PALETTE["text_primary"], anchor="w").pack(side="left")
-
             tab_b = ctk.CTkFrame(top, fg_color=PALETTE["border"], corner_radius=4)
             tab_b.pack(side="right")
-            tr(tab_b, fg_color="border")
             ctk.CTkLabel(tab_b, text=item["tab"], font=("Courier New", 8, "bold"),
                          text_color=color).pack(padx=6, pady=2)
-
             ctk.CTkLabel(card, text=item["meta"], font=("Courier New", 9),
-                         text_color=PALETTE["text_dim"], anchor="w").pack(fill="x", padx=14, pady=(0, 2))
+                         text_color=PALETTE["text_dim"], anchor="w"
+                         ).pack(fill="x", padx=14, pady=(0, 2))
             ctk.CTkLabel(card, text=item["detail"], font=("Courier New", 10),
                          text_color=PALETTE["text_secondary"], wraplength=860,
                          justify="left", anchor="w").pack(fill="x", padx=14, pady=(0, 8))
+
+        def _render_batch(i=0):
+            for item in results[i : i + BATCH]:
+                _make_card(item)
+            if i + BATCH < result_count:
+                inner.after(0, _render_batch, i + BATCH)
+
+        _render_batch()
         self._search_active = True
 
     def _clear_search(self):
@@ -969,20 +996,24 @@ class DashboardPanel(ctk.CTkFrame):
         self._render_feed(category)
 
     def _render_feed(self, category):
-        for w in self._feed_scroll.winfo_children():
-            w.destroy()
+        # Build cards once, then just show/hide — no destroy/recreate
+        if not self._event_cards:
+            for event in self.EVENTS:
+                card = self._make_event_card(*event)
+                self._event_cards.append((event[1], card))   # (category, widget)
 
-        filtered = [e for e in self.EVENTS
-                    if category == "ALL" or e[1] == category]
+        has_visible = False
+        for cat, card in self._event_cards:
+            if category == "ALL" or cat == category:
+                card.pack(fill="x")
+                has_visible = True
+            else:
+                card.pack_forget()
 
-        if not filtered:
+        if not has_visible:
             ctk.CTkLabel(self._feed_scroll, text="No events in this category.",
                          font=("Courier New", 11),
                          text_color=PALETTE["text_dim"]).pack(pady=30)
-            return
-
-        for date, cat, headline, detail, color_key in filtered:
-            self._make_event_card(date, cat, headline, detail, color_key)
 
     def _make_event_card(self, date, cat, headline, detail, color_key):
         color = PALETTE.get(color_key, PALETTE["accent"])
@@ -993,7 +1024,7 @@ class DashboardPanel(ctk.CTkFrame):
 
         card = ctk.CTkFrame(self._feed_scroll, fg_color="transparent",
                              corner_radius=0)
-        card.pack(fill="x")
+        # NOTE: caller controls pack()
 
         inner = ctk.CTkFrame(card, fg_color="transparent")
         inner.pack(fill="x", padx=16, pady=10)
@@ -1036,8 +1067,9 @@ class DashboardPanel(ctk.CTkFrame):
                      ).pack(fill="x")
 
         # Divider
-        ctk.CTkFrame(self._feed_scroll, height=1,
+        ctk.CTkFrame(card, height=1,
                      fg_color=PALETTE["border"], corner_radius=0).pack(fill="x", padx=12)
+        return card
 
 
 class LegalQAPanel(ctk.CTkFrame):
@@ -1153,6 +1185,7 @@ class BillsPanel(ctk.CTkFrame):
         self._filtered   = []   # rows after search/type filter
         self._current_president = list(self.SOURCES.keys())[0]
         self._base_dir   = os.path.dirname(os.path.abspath(__file__))
+        self._csv_cache: dict = {}   # president name → cached list of rows
         self._build()
 
     def _build(self):
@@ -1230,8 +1263,10 @@ class BillsPanel(ctk.CTkFrame):
             text_color=PALETTE["text_primary"], font=("Georgia", 13)
         )
         self._search_entry.pack(side="left", fill="x", expand=True, padx=16, pady=10)
+        self._bills_debouncer = _Debouncer(250)
         self._search_entry.bind("<Return>", lambda e: self._apply_filter())
-        self._search_entry.bind("<KeyRelease>", lambda e: self._apply_filter())
+        self._search_entry.bind("<KeyRelease>", lambda e: self._bills_debouncer.call(
+            self._search_entry, self._apply_filter))
 
         # Type filter
         self._type_var = ctk.StringVar(value="All Types")
@@ -1355,7 +1390,9 @@ class BillsPanel(ctk.CTkFrame):
                 btn.configure(bg=PALETTE["surface"], fg=PALETTE["text_secondary"],
                               font=("Courier New", 10))
 
-        self._all_rows = self._load_csv(name)
+        if name not in self._csv_cache:
+            self._csv_cache[name] = self._load_csv(name)
+        self._all_rows = self._csv_cache[name]
         self._search_entry.delete(0, "end")
         self._type_var.set("All Types")
         self._apply_filter()
@@ -1400,15 +1437,16 @@ class BillsPanel(ctk.CTkFrame):
         self._type_var.set("All Types")
         self._apply_filter()
 
+    PAGE_SIZE = 150   # rows rendered per batch
+
     # ── Render rows into the list frame ──────────────────────────────────────
     def _render_rows(self):
-        # Clear existing rows
         for w in self._list_frame.winfo_children():
             w.destroy()
 
-        color = self.PARTY_COLORS.get(self._current_president, PALETTE["accent"])
-        total = len(self._all_rows)
-        shown = len(self._filtered)
+        color  = self.PARTY_COLORS.get(self._current_president, PALETTE["accent"])
+        total  = len(self._all_rows)
+        shown  = len(self._filtered)
         self._count_lbl.configure(
             text=f"  {shown:,} of {total:,} RECORDS — {self._current_president}  "
         )
@@ -1419,8 +1457,32 @@ class BillsPanel(ctk.CTkFrame):
                          text_color=PALETTE["text_dim"]).pack(pady=40)
             return
 
-        for row in self._filtered:
+        self._render_page(0, color)
+
+    def _render_page(self, start, color):
+        batch = self._filtered[start : start + self.PAGE_SIZE]
+        for row in batch:
             self._make_row(row, color)
+
+        end = start + len(batch)
+        if end < len(self._filtered):
+            remaining = len(self._filtered) - end
+            ctk.CTkButton(
+                self._list_frame,
+                text=f"Load {min(self.PAGE_SIZE, remaining):,} more  ({remaining:,} remaining)",
+                height=32, corner_radius=6,
+                fg_color=PALETTE["surface_2"], hover_color=PALETTE["border"],
+                text_color=PALETTE["accent"],
+                font=("Courier New", 10, "bold"),
+                command=lambda s=end, c=color: self._load_more(s, c)
+            ).pack(fill="x", padx=8, pady=8)
+
+    def _load_more(self, start, color):
+        # Remove the "Load more" button then append next page
+        children = self._list_frame.winfo_children()
+        if children:
+            children[-1].destroy()  # remove Load more btn
+        self._render_page(start, color)
 
     def _make_row(self, row, color):
         eo_num  = str(row.get("executive_order_number", "")).strip() or "—"
@@ -1805,8 +1867,12 @@ class WarCard(ctk.CTkFrame):
 
     def _build_body(self):
         self.body = ctk.CTkFrame(self, fg_color="transparent")
-        # hidden until expanded
+        self._body_populated = False  # deferred until first expand
 
+    def _populate_body(self):
+        if self._body_populated:
+            return
+        self._body_populated = True
         # Summary paragraph
         ctk.CTkLabel(
             self.body,
@@ -1859,6 +1925,7 @@ class WarCard(ctk.CTkFrame):
     def _toggle(self):
         self._expanded = not self._expanded
         if self._expanded:
+            self._populate_body()
             self.body.pack(fill="x", pady=(0, 12))
             self.toggle_btn.configure(text="▲  Close")
         else:
@@ -2651,32 +2718,34 @@ class PresidentCard(ctk.CTkFrame):
         self.toggle_btn.pack(side="right")
 
         self.facts_frame = ctk.CTkFrame(self, fg_color="transparent")
-        # hidden until expanded
+        self._facts_populated = False  # deferred until expand
 
+        for w in (hdr, info, meta_row):
+            w.bind("<Button-1>", lambda e: self._toggle())
+
+    def _populate_facts(self):
+        if self._facts_populated:
+            return
+        self._facts_populated = True
         for fact in self.pres["key_facts"]:
             row = ctk.CTkFrame(self.facts_frame, fg_color="transparent")
             row.pack(fill="x", padx=62, pady=2)
-
             dot = ctk.CTkFrame(row, width=5, height=5, corner_radius=3,
                                fg_color=self.era_color)
             dot.pack(side="left", padx=(0, 8))
             dot.pack_propagate(False)
-
             ctk.CTkLabel(
                 row, text=fact,
                 font=("Courier New", 10),
                 text_color=PALETTE["text_secondary"],
                 wraplength=750, justify="left", anchor="w"
             ).pack(side="left", fill="x", expand=True)
-
         ctk.CTkFrame(self.facts_frame, height=8, fg_color="transparent").pack()
-
-        for w in (hdr, info, meta_row):
-            w.bind("<Button-1>", lambda e: self._toggle())
 
     def _toggle(self):
         self._expanded = not self._expanded
         if self._expanded:
+            self._populate_facts()
             self.facts_frame.pack(fill="x")
             self.toggle_btn.configure(text="▲")
         else:
@@ -2746,8 +2815,12 @@ class EraSection(ctk.CTkFrame):
 
     def _build_body(self):
         self.body = ctk.CTkFrame(self, fg_color="transparent")
+        self._body_populated = False  # deferred until first expand
 
-        # Era summary
+    def _populate_body(self):
+        if self._body_populated:
+            return
+        self._body_populated = True
         ctk.CTkLabel(
             self.body,
             text=self.era_data["summary"],
@@ -2755,17 +2828,15 @@ class EraSection(ctk.CTkFrame):
             text_color=PALETTE["text_secondary"],
             wraplength=860, justify="left", anchor="w"
         ).pack(fill="x", padx=24, pady=(0, 12))
-
-        # President cards
         for pres in self.era_data["presidents"]:
             PresidentCard(self.body, pres, self.era_data["color"]).pack(
                 fill="x", padx=24, pady=(0, 8))
-
         ctk.CTkFrame(self.body, height=12, fg_color="transparent").pack()
 
     def _toggle(self):
         self._expanded = not self._expanded
         if self._expanded:
+            self._populate_body()   # build widgets only when needed
             self.body.pack(fill="x", pady=(0, 12))
             self.toggle_btn.configure(text="▲  Collapse")
         else:
@@ -2850,16 +2921,18 @@ class GovHistoryPanel(ctk.CTkFrame):
             self._era_sections.append(section)
 
     def _expand_all(self):
-        for section in self._era_sections:
-            if not section._expanded:
-                section._toggle()
+        """Expand sections one per frame so the UI stays responsive."""
+        pending = [s for s in self._era_sections if not s._expanded]
+        def _step(i=0):
+            if i >= len(pending):
+                return
+            pending[i]._toggle()
+            self.after(0, _step, i + 1)
+        _step()
 
     def _collapse_all(self):
         for section in self._era_sections:
             if section._expanded:
-                section._toggle()
-
-
                 section._toggle()
 
 
@@ -3030,12 +3103,19 @@ class ElectionHistoryPanel(ctk.CTkFrame):
         self._render(label)
 
     def _render(self, label):
-        for w in self._scroll.winfo_children():
-            w.destroy()
-        for e in ELECTION_DATA:
-            if label=="Republican wins" and e["winner_party"]!="R": continue
-            if label=="Democrat wins" and e["winner_party"]!="D": continue
-            ElectionCard(self._scroll, e).pack(fill="x", pady=(0,10))
+        # Build cards once, then show/hide
+        if not hasattr(self, "_election_cards"):
+            self._election_cards = []
+            for e in ELECTION_DATA:
+                card = ElectionCard(self._scroll, e)
+                self._election_cards.append((e["winner_party"], card))
+        for party, card in self._election_cards:
+            if label == "Republican wins" and party != "R":
+                card.pack_forget()
+            elif label == "Democrat wins" and party != "D":
+                card.pack_forget()
+            else:
+                card.pack(fill="x", pady=(0, 10))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -3459,149 +3539,6 @@ class ScotusPanel(ctk.CTkFrame):
 #  GLOBAL SEARCH PANEL
 # ══════════════════════════════════════════════════════════════════════════════
 
-class GlobalSearchPanel(ctk.CTkFrame):
-    """Searches across events, presidents, wars, elections, SCOTUS rulings, congress bills."""
-
-    SOURCES = []  # populated after all data is defined
-
-    def __init__(self, master, **kw):
-        super().__init__(master, fg_color="transparent", **kw)
-        self._build()
-
-    def _build(self):
-        hdr_row = ctk.CTkFrame(self, fg_color="transparent")
-        hdr_row.pack(fill="x", padx=40, pady=(32,4))
-        tr(ctk.CTkLabel(hdr_row, text="Global Search",
-                     font=("Georgia",24,"bold"), text_color=PALETTE["text_primary"], anchor="w"),
-           text_color="text_primary").pack(side="left")
-        tr(ctk.CTkLabel(hdr_row,
-                     text="  Searches events, presidents, wars, elections, SCOTUS & Congress",
-                     font=("Courier New",10), text_color=PALETTE["text_dim"]),
-           text_color="text_dim").pack(side="left", pady=(8,0))
-
-        # Search bar
-        bar = ctk.CTkFrame(self, fg_color=PALETTE["surface"], corner_radius=10,
-                            border_width=1, border_color=PALETTE["accent"])
-        bar.pack(fill="x", padx=40, pady=(4,16))
-        tr(bar, fg_color="surface", border_color="accent")
-
-        self._entry = ctk.CTkEntry(bar,
-            placeholder_text="Type to search everything — press Enter or click Search...",
-            placeholder_text_color=PALETTE["text_dim"],
-            fg_color="transparent", border_width=0,
-            text_color=PALETTE["text_primary"], font=("Georgia",14))
-        self._entry.pack(side="left", fill="x", expand=True, padx=16, pady=12)
-        self._entry.bind("<Return>", lambda e: self._search())
-        tr(self._entry, text_color="text_primary")
-
-        ctk.CTkButton(bar, text="Search", width=100, height=36, corner_radius=8,
-            fg_color=PALETTE["accent"], hover_color=PALETTE["accent_dim"],
-            text_color=PALETTE["bg"], font=("Courier New",11,"bold"),
-            command=self._search).pack(side="right", padx=12, pady=8)
-
-        self._count_lbl = tr(ctk.CTkLabel(self, text="",
-                     font=("Courier New",10), text_color=PALETTE["text_dim"], anchor="w"),
-                     text_color="text_dim")
-        self._count_lbl.pack(fill="x", padx=40, pady=(0,8))
-
-        self._scroll = ctk.CTkScrollableFrame(self, fg_color="transparent",
-            scrollbar_button_color=PALETTE["border"])
-        self._scroll.pack(fill="both", expand=True, padx=40, pady=(0,32))
-
-        # Build searchable corpus once
-        self._corpus = self._build_corpus()
-
-    def _build_corpus(self):
-        items = []
-        # Dashboard events
-        for date, cat, headline, detail, _ in DashboardPanel.EVENTS:
-            items.append({"tab":"Dashboard","label":headline,
-                          "meta":f"{cat}  •  {date}","detail":detail,"color":"accent"})
-        # Wars
-        for w in WARS_DATA:
-            items.append({"tab":"US Wars","label":w["name"],
-                          "meta":f"{w['years']}  •  Deaths: {w['us_deaths']}",
-                          "detail":w["summary"],"color":"danger" if w["status"]=="ongoing" else "text_secondary"})
-        # Gov history presidents
-        for era in GOV_ERAS:
-            for p in era["presidents"]:
-                items.append({"tab":"Gov. History","label":p["name"],
-                              "meta":f"{p['party']}  •  {p['years']}",
-                              "detail":"  |  ".join(p["key_facts"][:2]),"color":"accent"})
-        # Elections
-        for e in ELECTION_DATA:
-            items.append({"tab":"Elections","label":f"{e['year']}: {e['winner']} vs {e['loser']}",
-                          "meta":f"EV {e['ev_winner']}–{e['ev_loser']}  •  PV margin {e['margin_pv']:+.1f}%",
-                          "detail":e["notes"],"color":"rep_light" if e["winner_party"]=="R" else "dem_light"})
-        # Economy eras
-        for era in ECON_DATA["eras"]:
-            items.append({"tab":"Economy","label":era["president"],
-                          "meta":f"{era['years']}  •  GDP: {era['gdp']}  Inflation: {era['inflation']}",
-                          "detail":era["notes"],"color":era["color"]})
-        # Congress bills
-        for b in CONGRESS_DATA["recent_bills"]:
-            items.append({"tab":"Congress","label":b["name"],
-                          "meta":f"{b['status']}  •  {b['date']}",
-                          "detail":b["summary"],"color":"positive" if b["status"]=="SIGNED" else "accent"})
-        # SCOTUS
-        for r in SCOTUS_DATA["landmark_rulings"]:
-            items.append({"tab":"Supreme Court","label":r["case"],
-                          "meta":f"{r['vote']} vote  •  {r['impact']} impact",
-                          "detail":r["summary"],"color":"rep_light" if r["leaning"]=="Conservative" else "dem_light"})
-        for j in SCOTUS_DATA["justices"]:
-            items.append({"tab":"Supreme Court","label":j["name"],
-                          "meta":f"{j['leaning']}  •  Appt: {j['appointed_by']} {j['year']}",
-                          "detail":j["title"],"color":"rep_light" if j["leaning"]=="Conservative" else "dem_light"})
-        return items
-
-    def _search(self):
-        q = self._entry.get().strip().lower()
-        for w in self._scroll.winfo_children():
-            w.destroy()
-
-        if not q:
-            self._count_lbl.configure(text="Type a query above and press Enter.")
-            return
-
-        results = [item for item in self._corpus
-                   if q in item["label"].lower() or q in item["detail"].lower()
-                   or q in item["meta"].lower()]
-
-        self._count_lbl.configure(text=f"  {len(results)} result{'s' if len(results)!=1 else ''} for \"{q}\"")
-
-        if not results:
-            tr(ctk.CTkLabel(self._scroll,
-                         text="No results found. Try different keywords.",
-                         font=("Courier New",12), text_color=PALETTE["text_dim"]),
-               text_color="text_dim").pack(pady=40)
-            return
-
-        for item in results:
-            color = PALETTE.get(item["color"], PALETTE["accent"])
-            card = ctk.CTkFrame(self._scroll, fg_color=PALETTE["surface"],
-                                 corner_radius=8, border_width=1,
-                                 border_color=PALETTE["border"])
-            card.pack(fill="x", pady=(0,8))
-            tr(card, fg_color="surface", border_color="border")
-            stripe = ctk.CTkFrame(card, width=4, fg_color=color, corner_radius=0)
-            stripe.place(x=0,y=0,relheight=1)
-
-            top = ctk.CTkFrame(card, fg_color="transparent")
-            top.pack(fill="x", padx=16, pady=(10,2))
-            ctk.CTkLabel(top, text=item["label"], font=("Georgia",12,"bold"),
-                         text_color=PALETTE["text_primary"], anchor="w").pack(side="left")
-            tab_badge = ctk.CTkFrame(top, fg_color=PALETTE["surface_2"], corner_radius=4)
-            tab_badge.pack(side="right")
-            tr(tab_badge, fg_color="surface_2")
-            ctk.CTkLabel(tab_badge, text=item["tab"], font=("Courier New",8,"bold"),
-                         text_color=color).pack(padx=6,pady=2)
-
-            ctk.CTkLabel(card, text=item["meta"], font=("Courier New",9),
-                         text_color=PALETTE["text_dim"], anchor="w").pack(fill="x",padx=16,pady=(0,2))
-            ctk.CTkLabel(card, text=item["detail"], font=("Courier New",10),
-                         text_color=PALETTE["text_secondary"], wraplength=860,
-                         justify="left", anchor="w").pack(fill="x",padx=16,pady=(0,10))
-
 
 class SettingsPanel(ctk.CTkFrame):
     def __init__(self, master, on_theme_change, **kwargs):
@@ -3729,19 +3666,28 @@ class ExecutiveInsight(ctk.CTk):
         self.content_area.pack(side="left", fill="both", expand=True)
         tr(self.content_area, fg_color="bg")
 
-        self.panels = {
-            "Dashboard":    DashboardPanel(self.content_area, self.engine),
-            "Legal Q&A":    LegalQAPanel(self.content_area, self.engine),
-            "Bills":        BillsPanel(self.content_area, self.engine),
-            "Party Impact": PartyImpactPanel(self.content_area),
-            "US Wars":      USWarsPanel(self.content_area),
-            "Gov. History": GovHistoryPanel(self.content_area),
-            "Elections":    ElectionHistoryPanel(self.content_area),
-            "Economy":      EconomyPanel(self.content_area),
-            "Congress":     CongressPanel(self.content_area),
-            "Supreme Court":ScotusPanel(self.content_area),
-            "Settings":     SettingsPanel(self.content_area, on_theme_change=self._apply_theme),
+        # Factories — panels are built only on first visit (lazy loading)
+        ca = self.content_area
+        en = self.engine
+        self._panel_factories = {
+            "Dashboard":    lambda: DashboardPanel(ca, en),
+            "Legal Q&A":    lambda: LegalQAPanel(ca, en),
+            "Bills":        lambda: BillsPanel(ca, en),
+            "Party Impact": lambda: PartyImpactPanel(ca),
+            "US Wars":      lambda: USWarsPanel(ca),
+            "Gov. History": lambda: GovHistoryPanel(ca),
+            "Elections":    lambda: ElectionHistoryPanel(ca),
+            "Economy":      lambda: EconomyPanel(ca),
+            "Congress":     lambda: CongressPanel(ca),
+            "Supreme Court":lambda: ScotusPanel(ca),
+            "Settings":     lambda: SettingsPanel(ca, on_theme_change=self._apply_theme),
         }
+        self._built_panels = {}
+        self._current_panel = None
+        self.panels = self._built_panels  # alias for theme switching
+        # Pre-build Dashboard immediately (it's the landing page)
+        dash = self._panel_factories["Dashboard"]()
+        self._built_panels["Dashboard"] = dash
 
     # ── Instant theme switch — no rebuild ─────────────────────────────────────
     def _apply_theme(self, theme_name):
@@ -3760,15 +3706,26 @@ class ExecutiveInsight(ctk.CTk):
         # Sidebar needs manual refresh (uses tk.Button which isn't CTk)
         self.sidebar.refresh_theme()
 
+        # Navigate to Settings so user can see the theme took effect
         self._show_panel("Settings")
 
-    # ── Panel switching ────────────────────────────────────────────────────────
+    # ── Panel switching — lazy load on first visit ───────────────────────────
     def _show_panel(self, name):
-        for panel in self.panels.values():
-            panel.pack_forget()
-        if name in self.panels:
-            self.panels[name].pack(fill="both", expand=True)
-        # Keep sidebar active state in sync
+        # Hide current panel (only the visible one)
+        if hasattr(self, "_current_panel") and self._current_panel:
+            self._current_panel.pack_forget()
+
+        # Lazy-build panel on first visit
+        if name not in self._built_panels:
+            factory = self._panel_factories.get(name)
+            if factory:
+                panel = factory()
+                panel.place_forget()
+                self._built_panels[name] = panel
+            else:
+                return
+        self._current_panel = self._built_panels[name]
+        self._current_panel.pack(fill="both", expand=True)
         if hasattr(self, "sidebar"):
             self.sidebar.set_active(name)
 
