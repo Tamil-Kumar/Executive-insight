@@ -490,7 +490,6 @@ class Sidebar(ctk.CTkFrame):
             ("Economy",      "  Economy"),
             ("Congress",     "  Congress"),
             ("Supreme Court","  Supreme Court"),
-            ("Search",       "  🔍 Global Search"),
         ]
         for key, label in nav_items:
             btn = SidebarButton(self, label, lambda k=key: on_select(k))
@@ -692,25 +691,77 @@ class DashboardPanel(ctk.CTkFrame):
                      text="Executive intelligence dashboard — current status and recent historical events.",
                      font=("Courier New", 11),
                      text_color=PALETTE["text_secondary"], anchor="w"
-                     ).pack(fill="x", padx=40, pady=(4, 20))
+                     ).pack(fill="x", padx=40, pady=(4, 12))
+
+        # ── Global Search bar ─────────────────────────────────────────────
+        search_bar = ctk.CTkFrame(self, fg_color=PALETTE["surface"],
+                                   corner_radius=10, border_width=1,
+                                   border_color=PALETTE["accent"])
+        search_bar.pack(fill="x", padx=40, pady=(0, 16))
+        tr(search_bar, fg_color="surface", border_color="accent")
+
+        self._search_entry = ctk.CTkEntry(
+            search_bar,
+            placeholder_text="🔍  Search everything — events, presidents, wars, elections, SCOTUS, Congress...",
+            placeholder_text_color=PALETTE["text_dim"],
+            fg_color="transparent", border_width=0,
+            text_color=PALETTE["text_primary"], font=("Georgia", 13))
+        self._search_entry.pack(side="left", fill="x", expand=True, padx=16, pady=10)
+        self._search_entry.bind("<Return>", lambda e: self._do_search())
+        self._search_entry.bind("<KeyRelease>", lambda e: self._live_search())
+        tr(self._search_entry, text_color="text_primary")
+
+        ctk.CTkButton(search_bar, text="Search", width=90, height=34,
+                      corner_radius=8,
+                      fg_color=PALETTE["accent"], hover_color=PALETTE["accent_dim"],
+                      text_color=PALETTE["bg"], font=("Courier New", 11, "bold"),
+                      command=self._do_search).pack(side="right", padx=10, pady=8)
+
+        ctk.CTkButton(search_bar, text="✕", width=30, height=34,
+                      corner_radius=8,
+                      fg_color="transparent", hover_color=PALETTE["border"],
+                      text_color=PALETTE["text_dim"], font=("Courier New", 11),
+                      command=self._clear_search).pack(side="right", padx=(0, 2), pady=8)
+
+        # Search results panel (hidden until search active)
+        self._search_results_frame = ctk.CTkFrame(self, fg_color=PALETTE["surface"],
+                                                    corner_radius=10, border_width=1,
+                                                    border_color=PALETTE["border"])
+        tr(self._search_results_frame, fg_color="surface", border_color="border")
+
+        self._search_results_inner = ctk.CTkScrollableFrame(
+            self._search_results_frame, fg_color="transparent",
+            scrollbar_button_color=PALETTE["border"])
+        self._search_results_inner.pack(fill="both", expand=True, padx=8, pady=8)
+
+        self._search_count = tr(ctk.CTkLabel(
+            self._search_results_frame, text="",
+            font=("Courier New", 9, "bold"),
+            text_color=PALETTE["text_dim"], anchor="w"),
+            text_color="text_dim")
+        self._search_count.pack(fill="x", padx=16, pady=(8, 0))
+
+        # Build corpus for search
+        self._corpus = self._build_search_corpus()
+        self._search_active = False
 
         # ── Stat cards ────────────────────────────────────────────────────
         stats_frame = ctk.CTkFrame(self, fg_color="transparent")
-        stats_frame.pack(fill="x", padx=40, pady=(0, 24))
+        stats_frame.pack(fill="x", padx=40, pady=(0, 16))
 
         self._stat_card(stats_frame, "DATABASE RECORDS", str(len(engine.all_data_content)), 0)
         self._stat_card(stats_frame, "ACTIVE LIBRARIES",  str(len(engine.csv_files)),        1)
         self._stat_card(stats_frame, "ACTIVE CONFLICTS",  "2",                               2)
         self._stat_card(stats_frame, "AI STATUS",         "CONNECTED",                       3)
 
-        # ── Two-column layout: feed left, filter right ────────────────────
-        body = ctk.CTkFrame(self, fg_color="transparent")
-        body.pack(fill="both", expand=True, padx=40, pady=(0, 32))
-        body.columnconfigure(0, weight=3)
-        body.columnconfigure(1, weight=1)
+        # ── Main content area (events + filters) ──────────────────────────
+        self._main_content = ctk.CTkFrame(self, fg_color="transparent")
+        self._main_content.pack(fill="both", expand=True, padx=40, pady=(0, 32))
+        self._main_content.columnconfigure(0, weight=3)
+        self._main_content.columnconfigure(1, weight=1)
 
         # Feed column
-        feed_frame = ctk.CTkFrame(body, fg_color="transparent")
+        feed_frame = ctk.CTkFrame(self._main_content, fg_color="transparent")
         feed_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 16))
 
         feed_hdr = ctk.CTkFrame(feed_frame, fg_color="transparent")
@@ -736,7 +787,7 @@ class DashboardPanel(ctk.CTkFrame):
         self._render_feed("ALL")
 
         # Filter column
-        filter_frame = ctk.CTkFrame(body, fg_color="transparent")
+        filter_frame = ctk.CTkFrame(self._main_content, fg_color="transparent")
         filter_frame.grid(row=0, column=1, sticky="nsew")
 
         ctk.CTkLabel(filter_frame, text="FILTER BY CATEGORY",
@@ -746,8 +797,6 @@ class DashboardPanel(ctk.CTkFrame):
         categories = ["ALL", "WAR", "POLITICS", "POLICY", "GOVERNMENT", "LEGAL", "CRISIS"]
         self._filter_btns = {}
         for cat in categories:
-            color = PALETTE.get(self.CATEGORY_COLORS.get(cat, "text_secondary"),
-                                PALETTE["text_secondary"])
             btn = ctk.CTkButton(
                 filter_frame,
                 text=cat,
@@ -776,7 +825,6 @@ class DashboardPanel(ctk.CTkFrame):
                                        corner_radius=6, border_width=1,
                                        border_color=PALETTE["border"])
             alert_card.pack(fill="x", pady=(0, 6))
-
             ctk.CTkLabel(alert_card, text=label,
                          font=("Courier New", 10, "bold"),
                          text_color=PALETTE.get(color_key, PALETTE["accent"]),
@@ -784,6 +832,114 @@ class DashboardPanel(ctk.CTkFrame):
             ctk.CTkLabel(alert_card, text=sub,
                          font=("Courier New", 9),
                          text_color=PALETTE["text_dim"], anchor="w").pack(fill="x", padx=12, pady=(0, 8))
+
+    # ── Search corpus ─────────────────────────────────────────────────────────
+    def _build_search_corpus(self):
+        items = []
+        for date, cat, headline, detail, _ in self.EVENTS:
+            items.append({"tab":"Dashboard","label":headline,
+                          "meta":f"{cat}  •  {date}","detail":detail,"color":"accent"})
+        for w in WARS_DATA:
+            items.append({"tab":"US Wars","label":w["name"],
+                          "meta":f"{w['years']}  •  Deaths: {w['us_deaths']}",
+                          "detail":w["summary"],"color":"danger" if w["status"]=="ongoing" else "text_secondary"})
+        for era in GOV_ERAS:
+            for p in era["presidents"]:
+                items.append({"tab":"Gov. History","label":p["name"],
+                              "meta":f"{p['party']}  •  {p['years']}",
+                              "detail":"  |  ".join(p["key_facts"][:2]),"color":"accent"})
+        for e in ELECTION_DATA:
+            items.append({"tab":"Elections","label":f"{e['year']}: {e['winner']} vs {e['loser']}",
+                          "meta":f"EV {e['ev_winner']}–{e['ev_loser']}  •  PV margin {e['margin_pv']:+.1f}%",
+                          "detail":e["notes"],"color":"rep_light" if e["winner_party"]=="R" else "dem_light"})
+        for era in ECON_DATA["eras"]:
+            items.append({"tab":"Economy","label":era["president"],
+                          "meta":f"{era['years']}  •  GDP: {era['gdp']}  Inflation: {era['inflation']}",
+                          "detail":era["notes"],"color":era["color"]})
+        for b in CONGRESS_DATA["recent_bills"]:
+            items.append({"tab":"Congress","label":b["name"],
+                          "meta":f"{b['status']}  •  {b['date']}",
+                          "detail":b["summary"],"color":"positive" if b["status"]=="SIGNED" else "accent"})
+        for r in SCOTUS_DATA["landmark_rulings"]:
+            items.append({"tab":"Supreme Court","label":r["case"],
+                          "meta":f"{r['vote']} vote  •  {r['impact']} impact",
+                          "detail":r["summary"],"color":"rep_light" if r["leaning"]=="Conservative" else "dem_light"})
+        for j in SCOTUS_DATA["justices"]:
+            items.append({"tab":"Supreme Court","label":j["name"],
+                          "meta":f"{j['leaning']}  •  Appt: {j['appointed_by']} {j['year']}",
+                          "detail":j["title"],"color":"rep_light" if j["leaning"]=="Conservative" else "dem_light"})
+        return items
+
+    def _live_search(self):
+        q = self._search_entry.get().strip()
+        if q:
+            self._do_search()
+        else:
+            self._clear_search()
+
+    def _do_search(self):
+        q = self._search_entry.get().strip().lower()
+        if not q:
+            self._clear_search()
+            return
+
+        results = [item for item in self._corpus
+                   if q in item["label"].lower()
+                   or q in item["detail"].lower()
+                   or q in item["meta"].lower()]
+
+        # Show search results, hide main content
+        self._main_content.pack_forget()
+        self._search_results_frame.pack(fill="both", expand=True, padx=40, pady=(0, 32))
+        self._search_count.configure(
+            text=f"  {len(results)} result{'s' if len(results)!=1 else ''} for \"{q}\"  —  click ✕ to return to dashboard")
+
+        for w in self._search_results_inner.winfo_children():
+            w.destroy()
+
+        if not results:
+            ctk.CTkLabel(self._search_results_inner,
+                         text="No results found. Try different keywords.",
+                         font=("Courier New", 12),
+                         text_color=PALETTE["text_dim"]).pack(pady=40)
+            return
+
+        for item in results:
+            color = PALETTE.get(item["color"], PALETTE["accent"])
+            card = ctk.CTkFrame(self._search_results_inner,
+                                 fg_color=PALETTE["surface_2"],
+                                 corner_radius=8, border_width=1,
+                                 border_color=PALETTE["border"])
+            card.pack(fill="x", pady=(0, 6))
+            tr(card, fg_color="surface_2", border_color="border")
+
+            stripe = ctk.CTkFrame(card, width=4, fg_color=color, corner_radius=0)
+            stripe.place(x=0, y=0, relheight=1)
+
+            top = ctk.CTkFrame(card, fg_color="transparent")
+            top.pack(fill="x", padx=14, pady=(8, 2))
+
+            ctk.CTkLabel(top, text=item["label"], font=("Georgia", 12, "bold"),
+                         text_color=PALETTE["text_primary"], anchor="w").pack(side="left")
+
+            tab_b = ctk.CTkFrame(top, fg_color=PALETTE["border"], corner_radius=4)
+            tab_b.pack(side="right")
+            tr(tab_b, fg_color="border")
+            ctk.CTkLabel(tab_b, text=item["tab"], font=("Courier New", 8, "bold"),
+                         text_color=color).pack(padx=6, pady=2)
+
+            ctk.CTkLabel(card, text=item["meta"], font=("Courier New", 9),
+                         text_color=PALETTE["text_dim"], anchor="w").pack(fill="x", padx=14, pady=(0, 2))
+            ctk.CTkLabel(card, text=item["detail"], font=("Courier New", 10),
+                         text_color=PALETTE["text_secondary"], wraplength=860,
+                         justify="left", anchor="w").pack(fill="x", padx=14, pady=(0, 8))
+        self._search_active = True
+
+    def _clear_search(self):
+        self._search_entry.delete(0, "end")
+        self._search_results_frame.pack_forget()
+        self._main_content.pack(fill="both", expand=True, padx=40, pady=(0, 32))
+        self._search_active = False
 
     def _stat_card(self, master, title, value, col):
         card = ctk.CTkFrame(master, fg_color=PALETTE["surface"],
@@ -3584,7 +3740,6 @@ class ExecutiveInsight(ctk.CTk):
             "Economy":      EconomyPanel(self.content_area),
             "Congress":     CongressPanel(self.content_area),
             "Supreme Court":ScotusPanel(self.content_area),
-            "Search":       GlobalSearchPanel(self.content_area),
             "Settings":     SettingsPanel(self.content_area, on_theme_change=self._apply_theme),
         }
 
