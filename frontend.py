@@ -19,15 +19,17 @@ ELECTION_DATA, ECON_DATA, CONGRESS_DATA, SCOTUS_DATA, GOV_ERAS, …)
 must still be defined in the main file exactly as before.
 """
 
-import threading
-import textwrap
-import time
-import random
-
-import requests
-from bs4 import BeautifulSoup
+print("Script started")
 
 import customtkinter as ctk
+print("customtkinter imported")
+
+import threading
+import tkinter as tk
+print("standard imports done")
+
+from backend import LegalEngine
+print("LegalEngine imported")
 
 print("Script started")
 
