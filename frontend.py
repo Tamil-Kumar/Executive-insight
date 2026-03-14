@@ -29,6 +29,14 @@ from bs4 import BeautifulSoup
 
 import customtkinter as ctk
 
+print("Script started")
+```
+Then run it again in CMD. If you see `"Script started"` printed — Python is executing the file but crashing before the window builds. If you see nothing at all, Python isn't finding or reading the file properly.
+
+**3. Also double-check the exact command you're typing** — can you paste it here? Something like:
+```
+python C:\Users\Name\Desktop\project\main.py
+
 # ── Shared scraper helpers ─────────────────────────────────────────────────────
 
 # Rotate user-agents so Google doesn't immediately block us
