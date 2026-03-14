@@ -695,6 +695,6 @@ class ScotusPanel(ctk.CTkFrame):
             ctk.CTkLabel(card, text=r["summary"], font=("Courier New", 10),
                          text_color=PALETTE["text_secondary"], wraplength=840,
                          justify="left", anchor="w").pack(fill="x", padx=16, pady=(0, 12))
-                  if __name__ == "__main__":
+if __name__ == "__main__":
     app = ExecutiveInsight()
     app.mainloop()
