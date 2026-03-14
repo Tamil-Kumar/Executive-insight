@@ -919,8 +919,12 @@ class ScotusPanel(ctk.CTkFrame):
                          text_color=PALETTE["text_secondary"], wraplength=840,
                          justify="left", anchor="w",
                          ).pack(fill="x", padx=16, pady=(0, 12))
-print("About to create app")
-app = ExecutiveInsight()
-print("App created")
-app.mainloop()
-print("mainloop started")
+class ExecutiveInsight(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("Executive Insight")
+        self.geometry("1280x800")
+        ...
+              if __name__ == "__main__":
+    app = ExecutiveInsight()
+    app.mainloop()
