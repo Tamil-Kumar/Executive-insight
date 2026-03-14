@@ -919,3 +919,8 @@ class ScotusPanel(ctk.CTkFrame):
                          text_color=PALETTE["text_secondary"], wraplength=840,
                          justify="left", anchor="w",
                          ).pack(fill="x", padx=16, pady=(0, 12))
+print("About to create app")
+app = ExecutiveInsight()
+print("App created")
+app.mainloop()
+print("mainloop started")
