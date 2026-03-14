@@ -696,5 +696,76 @@ class ScotusPanel(ctk.CTkFrame):
                          text_color=PALETTE["text_secondary"], wraplength=840,
                          justify="left", anchor="w").pack(fill="x", padx=16, pady=(0, 12))
 if __name__ == "__main__":
+  class ExecutiveInsight(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("Executive Insight")
+        self.geometry("1280x800")
+        self.configure(fg_color=PALETTE["bg"])
+        self.engine = LegalEngine()
+        self._build_ui()
+        self._show_panel("Dashboard")
+
+    def _build_ui(self):
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.pack(fill="both", expand=True)
+        self.sidebar = Sidebar(body, on_select=self._show_panel)
+        self.sidebar.pack(side="left", fill="y")
+        self._divider = ctk.CTkFrame(body, width=1, fg_color=PALETTE["border"], corner_radius=0)
+        self._divider.pack(side="left", fill="y")
+        tr(self._divider, fg_color="border")
+        self.content_area = ctk.CTkFrame(body, fg_color=PALETTE["bg"], corner_radius=0)
+        self.content_area.pack(side="left", fill="both", expand=True)
+        tr(self.content_area, fg_color="bg")
+        ca = self.content_area
+        en = self.engine
+        self._panel_factories = {
+            "Dashboard":    lambda: DashboardPanel(ca, en),
+            "Legal Q&A":    lambda: LegalQAPanel(ca, en),
+            "Bills":        lambda: BillsPanel(ca, en),
+            "Party Impact": lambda: PartyImpactPanel(ca),
+            "US Wars":      lambda: USWarsPanel(ca),
+            "Gov. History": lambda: GovHistoryPanel(ca),
+            "Elections":    lambda: ElectionHistoryPanel(ca),
+            "Economy":      lambda: EconomyPanel(ca),
+            "Congress":     lambda: CongressPanel(ca),
+            "Supreme Court":lambda: ScotusPanel(ca),
+            "Settings":     lambda: SettingsPanel(ca, on_theme_change=self._apply_theme),
+        }
+        self._built_panels = {}
+        self._current_panel = None
+        self.panels = self._built_panels
+        dash = self._panel_factories["Dashboard"]()
+        self._built_panels["Dashboard"] = dash
+
+    def _apply_theme(self, theme_name):
+        if theme_name not in THEMES:
+            return
+        PALETTE.update(THEMES[theme_name])
+        CURRENT_THEME[0] = theme_name
+        ctk.set_appearance_mode(PALETTE["ctk_mode"])
+        self.configure(fg_color=PALETTE["bg"])
+        apply_theme_to_registry()
+        self.sidebar.refresh_theme()
+        self._show_panel("Settings")
+
+    def _show_panel(self, name):
+        if hasattr(self, "_current_panel") and self._current_panel:
+            self._current_panel.pack_forget()
+        if name not in self._built_panels:
+            factory = self._panel_factories.get(name)
+            if factory:
+                panel = factory()
+                panel.place_forget()
+                self._built_panels[name] = panel
+            else:
+                return
+        self._current_panel = self._built_panels[name]
+        self._current_panel.pack(fill="both", expand=True)
+        if hasattr(self, "sidebar"):
+            self.sidebar.set_active(name)
+
+
+if __name__ == "__main__":
     app = ExecutiveInsight()
     app.mainloop()
