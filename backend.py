@@ -4,7 +4,7 @@ from langchain_openai import OpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_community.document_loaders.csv_loader import CSVLoader
 from langchain_core.output_parsers import StrOutputParser
-
+import pandas as pd
 # This loads the variables from .env into the environment
 load_dotenv()
 
@@ -43,10 +43,11 @@ class LegalEngine:
         for file in self.csv_files:
             if os.path.exists(file):
                 try:
-                    loader = CSVLoader(file_path=file)
-                    data = loader.load()
-                    for doc in data:
-                        self.all_data_content.append(doc.page_content)
+                    df = pd.read_csv(file, dtype=str).fillna('')
+                    for _, row in df.iterrows():
+                        # Mimic CSVLoader's page_content format: "col: val\ncol: val..."
+                        content = "\n".join(f"{k}: {v}" for k, v in row.items() if v)
+                        self.all_data_content.append(content)
                 except Exception as e:
                     print(f"Error loading {file}: {e}")
 

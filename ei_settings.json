@@ -1,0 +1,9 @@
+{
+  "appearance": "Dark",
+  "font_size": "Medium",
+  "results_limit": 200,
+  "ai_model": "gpt-3.5-turbo-instruct",
+  "openai_key": "",
+  "data_folder": "",
+  "window_size": "Fullscreen"
+}
