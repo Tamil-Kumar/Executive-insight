@@ -3635,85 +3635,51 @@ class SettingsPanel(ctk.CTkFrame):
         about_frame = ctk.CTkFrame(container, fg_color="transparent")
         about_frame.pack(fill="x", padx=30, pady=(0, 30))
         about_frame.columnconfigure(0, weight=1)
-        about_frame.columnconfigure(1, weight=1)
 
-        # ── Person card helper ────────────────────────────────────────────
-        def _person_card(parent, col, initials, name, role, bio, accent_key):
-            card = ctk.CTkFrame(parent, fg_color=PALETTE["surface_2"],
-                                corner_radius=12, border_width=1,
-                                border_color=PALETTE["border"])
-            card.grid(row=0, column=col,
-                      padx=(0, 8) if col == 0 else (8, 0),
-                      sticky="nsew")
-            tr(card, fg_color="surface_2", border_color="border")
+        # ── Person card ───────────────────────────────────────────────────
+        card = ctk.CTkFrame(about_frame, fg_color=PALETTE["surface_2"],
+                            corner_radius=12, border_width=1,
+                            border_color=PALETTE["border"])
+        card.grid(row=0, column=0, sticky="nsew")
+        tr(card, fg_color="surface_2", border_color="border")
 
-            # Top colour bar
-            bar = ctk.CTkFrame(card, height=3, fg_color=PALETTE[accent_key],
-                               corner_radius=0)
-            bar.pack(fill="x")
-            tr(bar, fg_color=accent_key)
+        bar = ctk.CTkFrame(card, height=3, fg_color=PALETTE["accent"], corner_radius=0)
+        bar.pack(fill="x")
+        tr(bar, fg_color="accent")
 
-            # Avatar circle
-            avatar_row = ctk.CTkFrame(card, fg_color="transparent")
-            avatar_row.pack(fill="x", padx=20, pady=(18, 0))
+        avatar_row = ctk.CTkFrame(card, fg_color="transparent")
+        avatar_row.pack(fill="x", padx=20, pady=(18, 0))
 
-            avatar = ctk.CTkFrame(avatar_row, width=52, height=52,
-                                   corner_radius=26,
-                                   fg_color=PALETTE[accent_key])
-            avatar.pack(side="left")
-            avatar.pack_propagate(False)
-            tr(avatar, fg_color=accent_key)
-            ctk.CTkLabel(avatar, text=initials,
-                         font=("Georgia", 18, "bold"),
-                         text_color=PALETTE["bg"]).place(relx=.5, rely=.5,
-                                                          anchor="center")
+        avatar = ctk.CTkFrame(avatar_row, width=52, height=52,
+                               corner_radius=26, fg_color=PALETTE["accent"])
+        avatar.pack(side="left")
+        avatar.pack_propagate(False)
+        tr(avatar, fg_color="accent")
+        ctk.CTkLabel(avatar, text="SY", font=("Georgia", 18, "bold"),
+                     text_color=PALETTE["bg"]).place(relx=.5, rely=.5, anchor="center")
 
-            name_col = ctk.CTkFrame(avatar_row, fg_color="transparent")
-            name_col.pack(side="left", padx=(14, 0))
-            tr(ctk.CTkLabel(name_col, text=name,
-                         font=("Georgia", 13, "bold"),
-                         text_color=PALETTE["text_primary"], anchor="w"),
-               text_color="text_primary").pack(anchor="w")
-            tr(ctk.CTkLabel(name_col, text=role,
-                         font=("Courier New", 9, "bold"),
-                         text_color=PALETTE[accent_key], anchor="w"),
-               text_color=accent_key).pack(anchor="w", pady=(2, 0))
+        name_col = ctk.CTkFrame(avatar_row, fg_color="transparent")
+        name_col.pack(side="left", padx=(14, 0))
+        tr(ctk.CTkLabel(name_col, text="Srihaas Yeluri",
+                     font=("Georgia", 13, "bold"),
+                     text_color=PALETTE["text_primary"], anchor="w"),
+           text_color="text_primary").pack(anchor="w")
+        tr(ctk.CTkLabel(name_col, text="CREATOR & DEVELOPER",
+                     font=("Courier New", 9, "bold"),
+                     text_color=PALETTE["accent"], anchor="w"),
+           text_color="accent").pack(anchor="w", pady=(2, 0))
 
-            # Bio text
-            tr(ctk.CTkLabel(card, text=bio,
-                         font=("Courier New", 10),
-                         text_color=PALETTE["text_secondary"],
-                         wraplength=310, justify="left", anchor="w"),
-               text_color="text_secondary").pack(fill="x", padx=20,
-                                                  pady=(14, 20))
-
-        _person_card(
-            about_frame, col=0,
-            initials="SY",
-            name="Srihaas Yeluri",
-            role="CREATOR & DEVELOPER",
-            bio=(
-                "14-year-old developer from Omaha, Nebraska, attending "
-                "Millard North Middle School. Passionate about coding, "
-                "gaming, and family. Driven by a single goal: use the "
-                "computational tools of today to build a better world tomorrow."
-            ),
-            accent_key="accent",
-        )
-
-        _person_card(
-            about_frame, col=1,
-            initials="AI",
-            name="Claude (Anthropic)",
-            role="AI COLLABORATOR",
-            bio=(
-                "An AI assistant built by Anthropic. Served as architect, "
-                "engineer, and co-developer throughout this project — "
-                "designing panels, writing data, optimising performance, "
-                "and translating ideas into working code, one conversation at a time."
-            ),
-            accent_key="blue_soft",
-        )
+        tr(ctk.CTkLabel(card,
+                     text=(
+                         "14-year-old developer from Omaha, Nebraska, attending "
+                         "Millard North Middle School. Passionate about coding, "
+                         "gaming, and family. Driven by a single goal: use the "
+                         "computational tools of today to build a better world tomorrow."
+                     ),
+                     font=("Courier New", 10),
+                     text_color=PALETTE["text_secondary"],
+                     wraplength=640, justify="left", anchor="w"),
+           text_color="text_secondary").pack(fill="x", padx=20, pady=(14, 20))
 
         # Tagline
         tagline_frame = ctk.CTkFrame(container, fg_color=PALETTE["surface"],
@@ -3723,7 +3689,7 @@ class SettingsPanel(ctk.CTkFrame):
         tr(tagline_frame, fg_color="surface", border_color="border")
         tr(ctk.CTkLabel(
             tagline_frame,
-            text='"Built by a student with a vision, and an AI with the tools to match it."',
+            text='"Using the computational tools of today to build a better world tomorrow."',
             font=("Georgia", 12, "italic"),
             text_color=PALETTE["accent"],
         ), text_color="accent").pack(pady=16)
