@@ -3,7 +3,9 @@ import threading
 import tkinter as tk
 import os
 import csv
-from backend import LegalEngine  
+from backend import (LegalEngine, load_csv_resilient, load_settings,
+                     save_settings, PROVIDERS, OPENAI_MODELS,
+                     OPENROUTER_MODELS)  
 
 # ── Appearance ─────────────────────────────────────────────────────────────────
 ctk.set_appearance_mode("Dark")
@@ -1363,17 +1365,19 @@ class BillsPanel(ctk.CTkFrame):
 
     # ── Data loading ──────────────────────────────────────────────────────────
     def _load_csv(self, name):
-        import csv
+        # Resilient loader: searches several folders, matches case-insensitively,
+        # handles BOMs and newlines inside quoted fields, and keeps a report
+        # explaining any failure.
         filename = self.SOURCES[name]
-        # look beside this file first, then uploads folder
-        for folder in (self._base_dir,
-                       "/mnt/user-data/uploads",
-                       "/mnt/user-data/outputs"):
-            path = os.path.join(folder, filename)
-            if os.path.exists(path):
-                with open(path, encoding="utf-8", errors="replace") as f:
-                    return list(csv.DictReader(f))
-        return []
+        try:
+            folder = str(load_settings().get("data_folder", "") or "")
+        except Exception:
+            folder = ""
+        rows, report = load_csv_resilient(filename, folder)
+        if not hasattr(self, "_load_reports"):
+            self._load_reports = {}
+        self._load_reports[name] = report
+        return rows
 
     # ── Tab selection ─────────────────────────────────────────────────────────
     def _select_president(self, name):
@@ -1452,9 +1456,21 @@ class BillsPanel(ctk.CTkFrame):
         )
 
         if not self._filtered:
-            ctk.CTkLabel(self._list_frame, text="No records match your search.",
-                         font=("Courier New", 12),
-                         text_color=PALETTE["text_dim"]).pack(pady=40)
+            report = getattr(self, "_load_reports", {}).get(self._current_president)
+            if not self._all_rows and report and not report.get("ok"):
+                msg = ("Could not load " + str(report.get("file", "")) + "\n\n"
+                       + str(report.get("error", "")) + "\n\n"
+                       + "Point Settings -> Data sources at the right folder, "
+                         "then press Rescan sources.")
+            elif not self._all_rows:
+                msg = ("No records loaded for " + str(self._current_president)
+                       + ". Check Settings -> Data sources.")
+            else:
+                msg = "No records match your search."
+            ctk.CTkLabel(self._list_frame, text=msg,
+                         font=("Courier New", 12), justify="left",
+                         wraplength=760,
+                         text_color=PALETTE["text_dim"]).pack(pady=40, padx=20)
             return
 
         self._render_page(0, color)
@@ -3541,33 +3557,113 @@ class ScotusPanel(ctk.CTkFrame):
 
 
 class SettingsPanel(ctk.CTkFrame):
-    def __init__(self, master, on_theme_change, **kwargs):
+    # Appearance, AI provider + API key, data sources, indexing, enrichment.
+
+    PROVIDER_LABELS = {"OpenRouter": "openrouter", "OpenAI": "openai"}
+    LIMIT_CHOICES = ["50 records", "200 records", "500 records", "Everything"]
+
+    def __init__(self, master, on_theme_change, engine=None, **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
         self.on_theme_change = on_theme_change
+        self.engine = engine
+        self._stop_flag = threading.Event()
+        try:
+            self._settings = load_settings()
+        except Exception:
+            self._settings = {}
         self._build()
 
+    # ── helpers ───────────────────────────────────────────────────────────
+    def _persist(self, updates, reload_data=False):
+        self._settings.update(updates)
+        try:
+            if self.engine is not None:
+                self.engine.apply_settings(updates, reload_data=reload_data)
+            else:
+                save_settings(updates)
+            return True
+        except Exception as e:
+            print("[settings] save failed:", e)
+            return False
+
+    def _ui(self, fn, *args):
+        # Marshal a worker-thread callback back onto the Tk thread.
+        try:
+            self.after(0, lambda: fn(*args))
+        except Exception:
+            pass
+
+    def _rule(self, parent):
+        f = ctk.CTkFrame(parent, height=1, fg_color=PALETTE["border"])
+        f.pack(fill="x", padx=20, pady=(4, 16))
+        tr(f, fg_color="border")
+
+    def _section(self, parent, label, first=False):
+        tr(ctk.CTkLabel(parent, text=label, font=("Courier New", 9, "bold"),
+                        text_color=PALETTE["text_dim"], anchor="w"),
+           text_color="text_dim").pack(fill="x", padx=30, pady=(24, 10))
+
+    def _hint(self, parent, text):
+        tr(ctk.CTkLabel(parent, text=text, font=("Courier New", 10),
+                        text_color=PALETTE["text_dim"], anchor="w",
+                        justify="left", wraplength=740),
+           text_color="text_dim").pack(fill="x", padx=30, pady=(0, 14))
+
+    def _button(self, parent, text, command, width=170, primary=True):
+        b = ctk.CTkButton(
+            parent, text=text, command=command, width=width, height=32,
+            corner_radius=6,
+            fg_color=PALETTE["accent"] if primary else PALETTE["surface_2"],
+            hover_color=PALETTE["accent_dim"] if primary else PALETTE["border"],
+            text_color=PALETTE["bg"] if primary else PALETTE["text_primary"],
+            font=("Courier New", 11, "bold"))
+        tr(b, fg_color="accent" if primary else "surface_2",
+           hover_color="accent_dim" if primary else "border",
+           text_color="bg" if primary else "text_primary")
+        return b
+
+    def _menu(self, parent, values, command=None, width=170):
+        m = ctk.CTkOptionMenu(
+            parent, values=values, command=command, width=width, height=32,
+            corner_radius=6, fg_color=PALETTE["surface_2"],
+            button_color=PALETTE["border"], button_hover_color=PALETTE["accent_dim"],
+            text_color=PALETTE["text_primary"], dropdown_fg_color=PALETTE["surface_2"],
+            dropdown_text_color=PALETTE["text_primary"],
+            dropdown_hover_color=PALETTE["border"],
+            font=("Courier New", 11))
+        tr(m, fg_color="surface_2", button_color="border",
+           text_color="text_primary")
+        return m
+
+    # ── build ─────────────────────────────────────────────────────────────
     def _build(self):
-        tr(ctk.CTkLabel(self, text="Preferences", font=("Georgia", 24, "bold"),
-                     text_color=PALETTE["text_primary"]),
+        outer = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        outer.pack(fill="both", expand=True)
+
+        tr(ctk.CTkLabel(outer, text="Preferences", font=("Georgia", 24, "bold"),
+                        text_color=PALETTE["text_primary"]),
            text_color="text_primary").pack(anchor="w", padx=40, pady=(40, 20))
 
-        container = ctk.CTkFrame(self, fg_color=PALETTE["surface"],
-                                  border_color=PALETTE["border"], border_width=1,
-                                  corner_radius=12)
-        container.pack(fill="x", padx=40, pady=(0, 20))
+        container = ctk.CTkFrame(outer, fg_color=PALETTE["surface"],
+                                 border_color=PALETTE["border"], border_width=1,
+                                 corner_radius=12)
+        container.pack(fill="x", padx=40, pady=(0, 40))
         tr(container, fg_color="surface", border_color="border")
 
-        # ── Theme selector ────────────────────────────────────────────────
+        self._build_appearance(container)
+        self._rule(container)
+        self._build_provider(container)
+        self._rule(container)
+        self._build_data(container)
+        self._rule(container)
+        self._build_about(container)
+
+    # ── appearance ────────────────────────────────────────────────────────
+    def _build_appearance(self, container):
         self._section(container, "APPEARANCE", first=True)
+        self._hint(container, "Pick a theme. Changes apply instantly across the "
+                              "whole application.")
 
-        ctk.CTkLabel(
-            container,
-            text="Select a theme — changes apply instantly across the entire application.",
-            font=("Courier New", 10),
-            text_color=PALETTE["text_dim"], anchor="w"
-        ).pack(fill="x", padx=30, pady=(0, 16))
-
-        # Theme preview swatches
         swatch_frame = ctk.CTkFrame(container, fg_color="transparent")
         swatch_frame.pack(fill="x", padx=30, pady=(0, 24))
 
@@ -3580,15 +3676,13 @@ class SettingsPanel(ctk.CTkFrame):
             size = 80 if is_active else 60
 
             swatch = ctk.CTkFrame(col, width=size, height=size, corner_radius=12,
-                                   fg_color=theme["bg"],
-                                   border_width=0)
+                                  fg_color=theme["bg"], border_width=0)
             swatch.pack()
             swatch.pack_propagate(False)
 
-            # Accent dot inside
             dot_size = 24 if is_active else 18
-            dot = ctk.CTkFrame(swatch, width=dot_size, height=dot_size, corner_radius=dot_size // 2,
-                                fg_color=theme["accent"])
+            dot = ctk.CTkFrame(swatch, width=dot_size, height=dot_size,
+                               corner_radius=dot_size // 2, fg_color=theme["accent"])
             dot.place(relx=0.5, rely=0.5, anchor="center")
 
             ctk.CTkLabel(col, text=name,
@@ -3604,39 +3698,420 @@ class SettingsPanel(ctk.CTkFrame):
             for w in (swatch, dot, col):
                 w.bind("<Button-1>", _click)
 
-        # ── Divider ───────────────────────────────────────────────────────
-        ctk.CTkFrame(container, height=1, fg_color=PALETTE["border"]).pack(
-            fill="x", padx=20, pady=(0, 20))
+    # ── AI provider + API key ─────────────────────────────────────────────
+    def _build_provider(self, container):
+        self._section(container, "AI PROVIDER")
+        self._hint(container,
+                   "Use OpenRouter or OpenAI. Paste the key here and it is saved "
+                   "to ei_settings.json beside the app, then used for Legal Q&A, "
+                   "indexing and record enrichment. No .env file needed. "
+                   "Environment variables OPENROUTER_API_KEY / OPENAI_API_KEY "
+                   "still work as a fallback.")
 
-        # ── AI section ────────────────────────────────────────────────────
-        self._section(container, "AI CORE ENGINE")
+        row = ctk.CTkFrame(container, fg_color="transparent")
+        row.pack(fill="x", padx=30, pady=(0, 10))
 
-        ai_row = ctk.CTkFrame(container, fg_color="transparent")
-        ai_row.pack(fill="x", padx=30, pady=(0, 24))
+        tr(ctk.CTkLabel(row, text="Provider", width=90, anchor="w",
+                        font=("Courier New", 11), text_color=PALETTE["text_secondary"]),
+           text_color="text_secondary").pack(side="left")
 
-        dot = ctk.CTkFrame(ai_row, width=10, height=10, corner_radius=5,
-                            fg_color=PALETTE["positive"])
-        dot.pack(side="left", padx=(0, 10))
-        dot.pack_propagate(False)
+        current = str(self._settings.get("ai_provider", "openrouter")).lower()
+        current_label = "OpenAI" if current == "openai" else "OpenRouter"
+        self._provider_menu = self._menu(row, ["OpenRouter", "OpenAI"],
+                                         command=self._on_provider_change, width=160)
+        self._provider_menu.set(current_label)
+        self._provider_menu.pack(side="left", padx=(0, 14))
 
-        ctk.CTkLabel(
-            ai_row,
-            text="Connected via OpenAI API (gpt-3.5-turbo-instruct)",
-            text_color=PALETTE["positive"],
-            font=("Courier New", 12)
-        ).pack(side="left")
+        self._console_lbl = tr(ctk.CTkLabel(row, text="", font=("Courier New", 10),
+                                            text_color=PALETTE["text_dim"], anchor="w"),
+                               text_color="text_dim")
+        self._console_lbl.pack(side="left")
 
-        # ── About Us section ──────────────────────────────────────────────
-        ctk.CTkFrame(container, height=1, fg_color=PALETTE["border"]).pack(
-            fill="x", padx=20, pady=(0, 0))
+        # key row
+        key_row = ctk.CTkFrame(container, fg_color="transparent")
+        key_row.pack(fill="x", padx=30, pady=(0, 10))
 
+        tr(ctk.CTkLabel(key_row, text="API key", width=90, anchor="w",
+                        font=("Courier New", 11), text_color=PALETTE["text_secondary"]),
+           text_color="text_secondary").pack(side="left")
+
+        self._key_entry = ctk.CTkEntry(
+            key_row, width=430, height=32, show="\u2022",
+            placeholder_text="sk-or-v1-...",
+            fg_color=PALETTE["surface_2"], border_color=PALETTE["border"],
+            text_color=PALETTE["text_primary"], font=("Courier New", 11))
+        tr(self._key_entry, fg_color="surface_2", border_color="border",
+           text_color="text_primary")
+        self._key_entry.pack(side="left", padx=(0, 12))
+
+        self._show_key = ctk.CTkCheckBox(
+            key_row, text="Show", command=self._toggle_key_visibility,
+            width=70, checkbox_width=16, checkbox_height=16,
+            fg_color=PALETTE["accent"], hover_color=PALETTE["accent_dim"],
+            text_color=PALETTE["text_secondary"], font=("Courier New", 10))
+        tr(self._show_key, fg_color="accent", text_color="text_secondary")
+        self._show_key.pack(side="left")
+
+        # model row
+        model_row = ctk.CTkFrame(container, fg_color="transparent")
+        model_row.pack(fill="x", padx=30, pady=(0, 10))
+
+        tr(ctk.CTkLabel(model_row, text="Model", width=90, anchor="w",
+                        font=("Courier New", 11), text_color=PALETTE["text_secondary"]),
+           text_color="text_secondary").pack(side="left")
+
+        self._model_entry = ctk.CTkEntry(
+            model_row, width=290, height=32,
+            fg_color=PALETTE["surface_2"], border_color=PALETTE["border"],
+            text_color=PALETTE["text_primary"], font=("Courier New", 11))
+        tr(self._model_entry, fg_color="surface_2", border_color="border",
+           text_color="text_primary")
+        self._model_entry.pack(side="left", padx=(0, 12))
+
+        self._model_menu = self._menu(model_row, OPENROUTER_MODELS,
+                                      command=self._on_model_pick, width=270)
+        self._model_menu.pack(side="left")
+
+        # actions
+        act = ctk.CTkFrame(container, fg_color="transparent")
+        act.pack(fill="x", padx=30, pady=(4, 6))
+
+        self._save_btn = self._button(act, "Save & test", self._save_and_test)
+        self._save_btn.pack(side="left", padx=(90, 10))
+
+        self._clear_btn = self._button(act, "Clear key", self._clear_key,
+                                       width=120, primary=False)
+        self._clear_btn.pack(side="left")
+
+        self._ai_status = tr(ctk.CTkLabel(
+            container, text="", font=("Courier New", 10), anchor="w",
+            justify="left", wraplength=740, text_color=PALETTE["text_dim"]),
+            text_color="text_dim")
+        self._ai_status.pack(fill="x", padx=30, pady=(6, 20))
+
+        self._sync_provider_fields(current)
+
+    def _sync_provider_fields(self, provider):
+        spec = PROVIDERS.get(provider, PROVIDERS["openrouter"])
+        key = str(self._settings.get(spec["key_field"], "") or "")
+        model = str(self._settings.get(spec["model_field"], "") or "")
+        self._key_entry.delete(0, "end")
+        self._key_entry.insert(0, key)
+        self._key_entry.configure(
+            placeholder_text="sk-or-v1-..." if provider == "openrouter" else "sk-...")
+        self._model_entry.delete(0, "end")
+        self._model_entry.insert(0, model)
+        choices = OPENROUTER_MODELS if provider == "openrouter" else OPENAI_MODELS
+        self._model_menu.configure(values=choices)
+        self._model_menu.set(model if model in choices else choices[0])
+        self._console_lbl.configure(text="Key from " + spec["console"])
+
+        if self.engine is not None:
+            try:
+                self._ai_status.configure(
+                    text="Current key: " + self.engine.llm.key_hint(),
+                    text_color=PALETTE["text_dim"])
+            except Exception:
+                pass
+
+    def _on_provider_change(self, label):
+        provider = self.PROVIDER_LABELS.get(label, "openrouter")
+        self._persist({"ai_provider": provider})
+        self._sync_provider_fields(provider)
+
+    def _on_model_pick(self, value):
+        self._model_entry.delete(0, "end")
+        self._model_entry.insert(0, value)
+
+    def _toggle_key_visibility(self):
+        self._key_entry.configure(show="" if self._show_key.get() else "\u2022")
+
+    def _clear_key(self):
+        provider = self.PROVIDER_LABELS.get(self._provider_menu.get(), "openrouter")
+        spec = PROVIDERS[provider]
+        self._key_entry.delete(0, "end")
+        self._persist({spec["key_field"]: ""})
+        self._ai_status.configure(text="Key cleared.", text_color=PALETTE["text_dim"])
+
+    def _save_and_test(self):
+        provider = self.PROVIDER_LABELS.get(self._provider_menu.get(), "openrouter")
+        spec = PROVIDERS[provider]
+        key = self._key_entry.get().strip()
+        model = self._model_entry.get().strip() or self._model_menu.get()
+
+        if key and not key.startswith(spec["key_prefix"]):
+            self._ai_status.configure(
+                text=("That does not look like a " + spec["label"] + " key - they "
+                      "start with " + spec["key_prefix"] + ". Saving anyway."),
+                text_color=PALETTE["warning"])
+
+        self._persist({"ai_provider": provider,
+                       spec["key_field"]: key,
+                       spec["model_field"]: model})
+
+        self._save_btn.configure(state="disabled", text="Testing...")
+        self._ai_status.configure(text="Contacting " + spec["label"] + "...",
+                                  text_color=PALETTE["text_secondary"])
+        threading.Thread(target=self._run_test, daemon=True).start()
+
+    def _run_test(self):
+        if self.engine is None:
+            self._ui(self._test_done, False, "No engine attached to this panel.")
+            return
+        try:
+            ok, msg = self.engine.llm.test()
+        except Exception as e:
+            ok, msg = False, str(e)
+        self._ui(self._test_done, ok, msg)
+
+    def _test_done(self, ok, msg):
+        self._save_btn.configure(state="normal", text="Save & test")
+        self._ai_status.configure(
+            text=msg,
+            text_color=PALETTE["positive"] if ok else PALETTE["danger"])
+
+    # ── data sources, index, enrichment ───────────────────────────────────
+    def _build_data(self, container):
+        self._section(container, "DATA SOURCES")
+        self._hint(container,
+                   "Every CSV the app expects, and where it actually found it. "
+                   "If a database shows MISSING, the reason is on the same line.")
+
+        folder_row = ctk.CTkFrame(container, fg_color="transparent")
+        folder_row.pack(fill="x", padx=30, pady=(0, 10))
+
+        tr(ctk.CTkLabel(folder_row, text="Folder", width=90, anchor="w",
+                        font=("Courier New", 11), text_color=PALETTE["text_secondary"]),
+           text_color="text_secondary").pack(side="left")
+
+        self._folder_entry = ctk.CTkEntry(
+            folder_row, width=430, height=32,
+            placeholder_text="leave blank to use the folder this app lives in",
+            fg_color=PALETTE["surface_2"], border_color=PALETTE["border"],
+            text_color=PALETTE["text_primary"], font=("Courier New", 11))
+        tr(self._folder_entry, fg_color="surface_2", border_color="border",
+           text_color="text_primary")
+        self._folder_entry.insert(0, str(self._settings.get("data_folder", "") or ""))
+        self._folder_entry.pack(side="left", padx=(0, 12))
+
+        self._button(folder_row, "Browse", self._browse_folder,
+                     width=100, primary=False).pack(side="left", padx=(0, 10))
+        self._button(folder_row, "Rescan sources", self._rescan,
+                     width=160).pack(side="left")
+
+        self._sources_box = ctk.CTkTextbox(
+            container, height=190, fg_color=PALETTE["surface_2"],
+            border_color=PALETTE["border"], border_width=1,
+            text_color=PALETTE["text_secondary"], font=("Courier New", 10),
+            wrap="none")
+        tr(self._sources_box, fg_color="surface_2", border_color="border",
+           text_color="text_secondary")
+        self._sources_box.pack(fill="x", padx=30, pady=(4, 18))
+        self._refresh_sources()
+
+        # ── indexing ──
+        self._section(container, "INDEXING")
+        self._hint(container,
+                   "The index is what Legal Q&A searches before it asks the "
+                   "model, so answers come from the whole archive instead of the "
+                   "first few rows. Rebuild it after adding CSVs.")
+
+        idx_row = ctk.CTkFrame(container, fg_color="transparent")
+        idx_row.pack(fill="x", padx=30, pady=(0, 8))
+        self._index_btn = self._button(idx_row, "Build search index", self._build_index)
+        self._index_btn.pack(side="left", padx=(90, 14))
+
+        self._index_bar = ctk.CTkProgressBar(idx_row, width=300, height=10,
+                                             progress_color=PALETTE["accent"],
+                                             fg_color=PALETTE["surface_2"])
+        tr(self._index_bar, progress_color="accent", fg_color="surface_2")
+        self._index_bar.set(0)
+        self._index_bar.pack(side="left")
+
+        self._index_status = tr(ctk.CTkLabel(
+            container, text="", font=("Courier New", 10), anchor="w",
+            justify="left", wraplength=740, text_color=PALETTE["text_dim"]),
+            text_color="text_dim")
+        self._index_status.pack(fill="x", padx=30, pady=(4, 18))
+
+        # ── enrichment ──
+        self._section(container, "FILL IN MISSING INFO")
+        self._hint(container,
+                   "Uses the API key above to complete records that are missing "
+                   "detail. Citation and document links are rebuilt from the "
+                   "Federal Register / GovInfo identifiers, so nothing is "
+                   "invented; the model adds a plain-English summary, topic tags, "
+                   "affected agencies and an impact rating. Results are cached in "
+                   "ei_enriched.json, so each record is only paid for once.")
+
+        enr_row = ctk.CTkFrame(container, fg_color="transparent")
+        enr_row.pack(fill="x", padx=30, pady=(0, 8))
+
+        self._limit_menu = self._menu(enr_row, self.LIMIT_CHOICES, width=160)
+        self._limit_menu.set(self.LIMIT_CHOICES[1])
+        self._limit_menu.pack(side="left", padx=(90, 12))
+
+        self._enrich_btn = self._button(enr_row, "Start filling", self._start_enrich,
+                                        width=150)
+        self._enrich_btn.pack(side="left", padx=(0, 10))
+
+        self._stop_btn = self._button(enr_row, "Stop", self._stop_enrich,
+                                      width=90, primary=False)
+        self._stop_btn.configure(state="disabled")
+        self._stop_btn.pack(side="left", padx=(0, 14))
+
+        self._enrich_bar = ctk.CTkProgressBar(enr_row, width=240, height=10,
+                                              progress_color=PALETTE["accent"],
+                                              fg_color=PALETTE["surface_2"])
+        tr(self._enrich_bar, progress_color="accent", fg_color="surface_2")
+        self._enrich_bar.set(0)
+        self._enrich_bar.pack(side="left")
+
+        self._enrich_status = tr(ctk.CTkLabel(
+            container, text="", font=("Courier New", 10), anchor="w",
+            justify="left", wraplength=740, text_color=PALETTE["text_dim"]),
+            text_color="text_dim")
+        self._enrich_status.pack(fill="x", padx=30, pady=(4, 22))
+        self._refresh_enrich_status()
+
+    def _browse_folder(self):
+        try:
+            from tkinter import filedialog
+            path = filedialog.askdirectory(title="Choose the folder holding the CSV files")
+        except Exception:
+            path = ""
+        if path:
+            self._folder_entry.delete(0, "end")
+            self._folder_entry.insert(0, path)
+            self._rescan()
+
+    def _rescan(self):
+        folder = self._folder_entry.get().strip()
+        self._persist({"data_folder": folder}, reload_data=True)
+        self._refresh_sources()
+        self._refresh_enrich_status()
+        if self.engine is not None:
+            loaded = len(self.engine.loaded_sources())
+            total = len(self.engine.load_report)
+            self._index_status.configure(
+                text=("Reloaded: " + str(loaded) + " of " + str(total)
+                      + " databases, " + format(len(self.engine.records), ",")
+                      + " records."),
+                text_color=PALETTE["text_secondary"])
+
+    def _refresh_sources(self):
+        self._sources_box.configure(state="normal")
+        self._sources_box.delete("1.0", "end")
+        if self.engine is None:
+            self._sources_box.insert("end", "No engine attached to this panel.")
+            self._sources_box.configure(state="disabled")
+            return
+        lines = []
+        for r in sorted(self.engine.load_report, key=lambda x: x["president"]):
+            name = str(r.get("president", ""))
+            if r.get("ok") and r.get("rows"):
+                lines.append("  OK       " + name.ljust(16)
+                             + format(r["rows"], ",").rjust(7) + " rows   "
+                             + str(r.get("path", "")))
+            else:
+                lines.append("  MISSING  " + name.ljust(16) + str(r.get("file", ""))
+                             + "  -  " + str(r.get("error", "")))
+        ok_count = len(self.engine.loaded_sources())
+        lines.append("")
+        lines.append("  " + str(ok_count) + " of " + str(len(self.engine.load_report))
+                     + " databases loaded  -  "
+                     + format(len(self.engine.records), ",") + " records total")
+        self._sources_box.insert("end", "\n".join(lines))
+        self._sources_box.configure(state="disabled")
+
+    def _build_index(self):
+        if self.engine is None:
+            return
+        self._index_btn.configure(state="disabled", text="Indexing...")
+        threading.Thread(target=self._run_index, daemon=True).start()
+
+    def _run_index(self):
+        def cb(frac, msg):
+            self._ui(self._index_progress, frac, msg)
+        try:
+            self.engine.build_index(progress_cb=cb)
+            path = self.engine.save_index()
+            self._ui(self._index_progress, 1.0,
+                     "Index built and saved to " + os.path.basename(path))
+        except Exception as e:
+            self._ui(self._index_progress, 0.0, "Index failed: " + str(e))
+        self._ui(lambda: self._index_btn.configure(state="normal",
+                                                   text="Build search index"))
+
+    def _index_progress(self, frac, msg):
+        try:
+            self._index_bar.set(max(0.0, min(1.0, float(frac))))
+            self._index_status.configure(text=msg, text_color=PALETTE["text_secondary"])
+        except Exception:
+            pass
+
+    def _refresh_enrich_status(self):
+        if self.engine is None:
+            return
+        try:
+            done, total = self.engine.enrichment_stats()
+            self._enrich_status.configure(
+                text=(format(done, ",") + " of " + format(total, ",")
+                      + " records already filled in (cached)."),
+                text_color=PALETTE["text_dim"])
+            self._enrich_bar.set(done / total if total else 0)
+        except Exception:
+            pass
+
+    def _start_enrich(self):
+        if self.engine is None:
+            return
+        if not self.engine.llm.configured:
+            self._enrich_status.configure(
+                text="Set an API key above first, then press Save & test.",
+                text_color=PALETTE["danger"])
+            return
+        choice = self._limit_menu.get()
+        limit = {"50 records": 50, "200 records": 200, "500 records": 500}.get(
+            choice, len(self.engine.records))
+        self._stop_flag.clear()
+        self._enrich_btn.configure(state="disabled", text="Working...")
+        self._stop_btn.configure(state="normal")
+        threading.Thread(target=self._run_enrich, args=(limit,), daemon=True).start()
+
+    def _run_enrich(self, limit):
+        def cb(frac, msg):
+            self._ui(self._enrich_progress, frac, msg)
+        try:
+            self.engine.enrich(limit=limit, progress_cb=cb, stop_flag=self._stop_flag)
+        except Exception as e:
+            self._ui(self._enrich_progress, 0.0, "Stopped: " + str(e))
+        self._ui(self._enrich_done)
+
+    def _enrich_progress(self, frac, msg):
+        try:
+            self._enrich_bar.set(max(0.0, min(1.0, float(frac))))
+            self._enrich_status.configure(text=msg, text_color=PALETTE["text_secondary"])
+        except Exception:
+            pass
+
+    def _enrich_done(self):
+        self._enrich_btn.configure(state="normal", text="Start filling")
+        self._stop_btn.configure(state="disabled")
+
+    def _stop_enrich(self):
+        self._stop_flag.set()
+        self._enrich_status.configure(text="Stopping after the current batch...",
+                                      text_color=PALETTE["warning"])
+
+    # ── about ─────────────────────────────────────────────────────────────
+    def _build_about(self, container):
         self._section(container, "ABOUT US")
 
         about_frame = ctk.CTkFrame(container, fg_color="transparent")
         about_frame.pack(fill="x", padx=30, pady=(0, 30))
         about_frame.columnconfigure(0, weight=1)
 
-        # ── Person card ───────────────────────────────────────────────────
         card = ctk.CTkFrame(about_frame, fg_color=PALETTE["surface_2"],
                             corner_radius=12, border_width=1,
                             border_color=PALETTE["border"])
@@ -3651,7 +4126,7 @@ class SettingsPanel(ctk.CTkFrame):
         avatar_row.pack(fill="x", padx=20, pady=(18, 0))
 
         avatar = ctk.CTkFrame(avatar_row, width=52, height=52,
-                               corner_radius=26, fg_color=PALETTE["accent"])
+                              corner_radius=26, fg_color=PALETTE["accent"])
         avatar.pack(side="left")
         avatar.pack_propagate(False)
         tr(avatar, fg_color="accent")
@@ -3661,49 +4136,38 @@ class SettingsPanel(ctk.CTkFrame):
         name_col = ctk.CTkFrame(avatar_row, fg_color="transparent")
         name_col.pack(side="left", padx=(14, 0))
         tr(ctk.CTkLabel(name_col, text="Srihaas Yeluri",
-                     font=("Georgia", 13, "bold"),
-                     text_color=PALETTE["text_primary"], anchor="w"),
+                        font=("Georgia", 13, "bold"),
+                        text_color=PALETTE["text_primary"], anchor="w"),
            text_color="text_primary").pack(anchor="w")
         tr(ctk.CTkLabel(name_col, text="CREATOR & DEVELOPER",
-                     font=("Courier New", 9, "bold"),
-                     text_color=PALETTE["accent"], anchor="w"),
+                        font=("Courier New", 9, "bold"),
+                        text_color=PALETTE["accent"], anchor="w"),
            text_color="accent").pack(anchor="w", pady=(2, 0))
 
         tr(ctk.CTkLabel(card,
-                     text=(
-                         "14-year-old developer from Omaha, Nebraska, attending "
-                         "Millard North Middle School. Passionate about coding, "
-                         "gaming, and family. Driven by a single goal: use the "
-                         "computational tools of today to build a better world tomorrow."
-                     ),
-                     font=("Courier New", 10),
-                     text_color=PALETTE["text_secondary"],
-                     wraplength=640, justify="left", anchor="w"),
+                        text=("14-year-old developer from Omaha, Nebraska, attending "
+                              "Millard North Middle School. Passionate about coding, "
+                              "gaming, and family. Driven by a single goal: use the "
+                              "computational tools of today to build a better world "
+                              "tomorrow."),
+                        font=("Courier New", 10),
+                        text_color=PALETTE["text_secondary"],
+                        wraplength=640, justify="left", anchor="w"),
            text_color="text_secondary").pack(fill="x", padx=20, pady=(14, 20))
 
-        # Tagline
         tagline_frame = ctk.CTkFrame(container, fg_color=PALETTE["surface"],
-                                      corner_radius=8, border_width=1,
-                                      border_color=PALETTE["border"])
+                                     corner_radius=8, border_width=1,
+                                     border_color=PALETTE["border"])
         tagline_frame.pack(fill="x", padx=30, pady=(0, 30))
         tr(tagline_frame, fg_color="surface", border_color="border")
         tr(ctk.CTkLabel(
             tagline_frame,
             text='"Using the computational tools of today to build a better world tomorrow."',
             font=("Georgia", 12, "italic"),
-            text_color=PALETTE["accent"],
-        ), text_color="accent").pack(pady=16)
-
-    def _section(self, parent, label, first=False):
-        ctk.CTkLabel(
-            parent, text=label,
-            font=("Courier New", 9, "bold"),
-            text_color=PALETTE["text_dim"], anchor="w"
-        ).pack(fill="x", padx=30, pady=(24 if not first else 24, 10))
+            text_color=PALETTE["accent"]), text_color="accent").pack(pady=16)
 
     def _on_theme_selected(self, name):
         self.on_theme_change(name)
-        # UI is rebuilt by on_theme_change so no swatch update needed here
 
 
 # ── Main Application ──────────────────────────────────────────────────────────
@@ -3748,7 +4212,7 @@ class ExecutiveInsight(ctk.CTk):
             "Economy":      lambda: EconomyPanel(ca),
             "Congress":     lambda: CongressPanel(ca),
             "Supreme Court":lambda: ScotusPanel(ca),
-            "Settings":     lambda: SettingsPanel(ca, on_theme_change=self._apply_theme),
+            "Settings":     lambda: SettingsPanel(ca, on_theme_change=self._apply_theme, engine=en),
         }
         self._built_panels = {}
         self._current_panel = None
