@@ -775,7 +775,7 @@ class DashboardPanel(ctk.CTkFrame):
         stats_frame = ctk.CTkFrame(self, fg_color="transparent")
         stats_frame.pack(fill="x", padx=40, pady=(0, 16))
 
-        self._stat_card(stats_frame, "DATABASE RECORDS", str(len(engine.all_data_content)), 0)
+        self._stat_card(stats_frame, "DATABASE RECORDS", str(len(engine.records)), 0)
         self._stat_card(stats_frame, "ACTIVE LIBRARIES",  str(len(engine.csv_files)),        1)
         self._stat_card(stats_frame, "ACTIVE CONFLICTS",  "2",                               2)
         self._stat_card(stats_frame, "AI STATUS",         "CONNECTED",                       3)
@@ -1140,8 +1140,8 @@ class LegalQAPanel(ctk.CTkFrame):
 class BillsPanel(ctk.CTkFrame):
     # Map display name → CSV filename (relative to this file)
     SOURCES = {
-        "Trump 2nd Term":  "trump2.csv",
-        "Trump 1st Term":  "trump_eos.csv",
+        "Trump 2nd Term":  "trump_eos.csv",   # 2025-2026
+        "Trump 1st Term":  "trump2.csv",      # 2017-2021
         "Biden":           "biden.csv",
         "Obama":           "obama.csv",
         "W. Bush":         "w_bush.csv",
@@ -1188,6 +1188,7 @@ class BillsPanel(ctk.CTkFrame):
         self._current_president = list(self.SOURCES.keys())[0]
         self._base_dir   = os.path.dirname(os.path.abspath(__file__))
         self._csv_cache: dict = {}   # president name → cached list of rows
+        self._data_version = getattr(engine, "data_version", 0)
         self._build()
 
     def _build(self):
@@ -1370,7 +1371,10 @@ class BillsPanel(ctk.CTkFrame):
         # explaining any failure.
         filename = self.SOURCES[name]
         try:
-            folder = str(load_settings().get("data_folder", "") or "")
+            # Prefer the engine's live setting; it is what a Rescan or a
+            # Federal Register sync just wrote to.
+            live = getattr(self.engine, "settings", None) or load_settings()
+            folder = str(live.get("data_folder", "") or "")
         except Exception:
             folder = ""
         rows, report = load_csv_resilient(filename, folder)
@@ -1393,6 +1397,13 @@ class BillsPanel(ctk.CTkFrame):
             else:
                 btn.configure(bg=PALETTE["surface"], fg=PALETTE["text_secondary"],
                               font=("Courier New", 10))
+
+        # A Federal Register sync or a rescan replaces the CSVs underneath us,
+        # so drop the cache whenever the engine has reloaded.
+        version = getattr(self.engine, "data_version", 0)
+        if version != self._data_version:
+            self._csv_cache.clear()
+            self._data_version = version
 
         if name not in self._csv_cache:
             self._csv_cache[name] = self._load_csv(name)
@@ -3567,6 +3578,7 @@ class SettingsPanel(ctk.CTkFrame):
         self.on_theme_change = on_theme_change
         self.engine = engine
         self._stop_flag = threading.Event()
+        self._index_stop = threading.Event()
         try:
             self._settings = load_settings()
         except Exception:
@@ -3896,8 +3908,9 @@ class SettingsPanel(ctk.CTkFrame):
 
         self._button(folder_row, "Browse", self._browse_folder,
                      width=100, primary=False).pack(side="left", padx=(0, 10))
-        self._button(folder_row, "Rescan sources", self._rescan,
-                     width=160).pack(side="left")
+        self._rescan_btn = self._button(folder_row, "Rescan sources", self._rescan,
+                                        width=160)
+        self._rescan_btn.pack(side="left")
 
         self._sources_box = ctk.CTkTextbox(
             container, height=190, fg_color=PALETTE["surface_2"],
@@ -3914,11 +3927,32 @@ class SettingsPanel(ctk.CTkFrame):
         self._hint(container,
                    "The index is what Legal Q&A searches before it asks the "
                    "model, so answers come from the whole archive instead of the "
-                   "first few rows. Rebuild it after adding CSVs.")
+                   "first few rows. With the pull enabled, indexing first "
+                   "downloads presidential documents from federalregister.gov "
+                   "(no API key needed) and writes them into the CSVs, which is "
+                   "how empty tabs get filled. Existing tabs keep their rows and "
+                   "only gain the last two years.")
+
+        sync_row = ctk.CTkFrame(container, fg_color="transparent")
+        sync_row.pack(fill="x", padx=30, pady=(0, 8))
+
+        self._sync_check = ctk.CTkCheckBox(
+            sync_row, text="Pull latest government data first",
+            width=280, checkbox_width=16, checkbox_height=16,
+            fg_color=PALETTE["accent"], hover_color=PALETTE["accent_dim"],
+            text_color=PALETTE["text_secondary"], font=("Courier New", 11))
+        tr(self._sync_check, fg_color="accent", text_color="text_secondary")
+        self._sync_check.select()
+        self._sync_check.pack(side="left", padx=(90, 14))
+
+        self._scope_menu = self._menu(
+            sync_row, ["Empty tabs only", "Every tab"], width=180)
+        self._scope_menu.set("Empty tabs only")
+        self._scope_menu.pack(side="left")
 
         idx_row = ctk.CTkFrame(container, fg_color="transparent")
         idx_row.pack(fill="x", padx=30, pady=(0, 8))
-        self._index_btn = self._button(idx_row, "Build search index", self._build_index)
+        self._index_btn = self._button(idx_row, "Sync & build index", self._build_index)
         self._index_btn.pack(side="left", padx=(90, 14))
 
         self._index_bar = ctk.CTkProgressBar(idx_row, width=300, height=10,
@@ -3986,8 +4020,28 @@ class SettingsPanel(ctk.CTkFrame):
             self._rescan()
 
     def _rescan(self):
+        # Reading and indexing happens on a worker thread so the window stays
+        # responsive on large archives.
         folder = self._folder_entry.get().strip()
-        self._persist({"data_folder": folder}, reload_data=True)
+        self._rescan_btn.configure(state="disabled", text="Scanning...")
+        threading.Thread(target=self._run_rescan, args=(folder,),
+                         daemon=True).start()
+
+    def _run_rescan(self, folder):
+        def cb(frac, msg):
+            self._ui(self._index_progress, frac, msg)
+        try:
+            self._settings["data_folder"] = folder
+            save_settings({"data_folder": folder})
+            if self.engine is not None:
+                self.engine.settings["data_folder"] = folder
+                self.engine.reload_data(progress_cb=cb)
+        except Exception as e:
+            self._ui(self._index_progress, 0.0, "Rescan failed: " + str(e))
+        self._ui(self._rescan_done)
+
+    def _rescan_done(self):
+        self._rescan_btn.configure(state="normal", text="Rescan sources")
         self._refresh_sources()
         self._refresh_enrich_status()
         if self.engine is not None:
@@ -4027,21 +4081,50 @@ class SettingsPanel(ctk.CTkFrame):
     def _build_index(self):
         if self.engine is None:
             return
-        self._index_btn.configure(state="disabled", text="Indexing...")
-        threading.Thread(target=self._run_index, daemon=True).start()
+        pull = bool(self._sync_check.get())
+        only_missing = (self._scope_menu.get() == "Empty tabs only")
+        self._index_stop.clear()
+        self._index_btn.configure(state="disabled",
+                                  text="Syncing..." if pull else "Indexing...")
+        threading.Thread(target=self._run_index, args=(pull, only_missing),
+                         daemon=True).start()
 
-    def _run_index(self):
+    def _run_index(self, pull=False, only_missing=True):
         def cb(frac, msg):
             self._ui(self._index_progress, frac, msg)
+        summary = []
         try:
-            self.engine.build_index(progress_cb=cb)
+            if pull:
+                summary = self.engine.sync_and_index(
+                    progress_cb=cb, stop_flag=self._index_stop,
+                    only_missing=only_missing)
+            else:
+                self.engine.build_index(progress_cb=cb)
             path = self.engine.save_index()
-            self._ui(self._index_progress, 1.0,
-                     "Index built and saved to " + os.path.basename(path))
+            self._ui(self._index_done, summary, os.path.basename(path))
         except Exception as e:
-            self._ui(self._index_progress, 0.0, "Index failed: " + str(e))
-        self._ui(lambda: self._index_btn.configure(state="normal",
-                                                   text="Build search index"))
+            self._ui(self._index_progress, 0.0, "Failed: " + str(e))
+            self._ui(self._index_reset)
+
+    def _index_done(self, summary, index_name):
+        added = sum(s["added"] for s in summary)
+        failed = [s for s in summary if s["error"]]
+        parts = [format(len(self.engine.records), ",") + " records indexed",
+                 "saved to " + index_name]
+        if summary:
+            parts.insert(0, format(added, ",") + " new records pulled from the "
+                             "Federal Register")
+        text = "  |  ".join(parts)
+        if failed:
+            text += "\n" + "\n".join(
+                "  " + s["president"] + ": " + s["error"] for s in failed[:4])
+        self._index_progress(1.0, text)
+        self._refresh_sources()
+        self._refresh_enrich_status()
+        self._index_reset()
+
+    def _index_reset(self):
+        self._index_btn.configure(state="normal", text="Sync & build index")
 
     def _index_progress(self, frac, msg):
         try:
