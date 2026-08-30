@@ -1,6 +1,8 @@
 import customtkinter as ctk
 import threading
 import tkinter as tk
+import webbrowser
+from tkinter import ttk
 import os
 import csv
 from backend import (LegalEngine, load_csv_resilient, load_settings,
@@ -143,6 +145,30 @@ def tr(widget, **palette_kwargs):
     _THEME_REGISTRY.append((ref, palette_kwargs))
     return widget
 
+_THEME_HOOKS = []
+
+
+def on_theme(fn):
+    """Register a callback for widgets the palette registry can't reach (ttk)."""
+    _THEME_HOOKS.append(_weakref.WeakMethod(fn) if hasattr(fn, "__self__")
+                        else (lambda f=fn: f))
+    return fn
+
+
+def _run_theme_hooks():
+    live = []
+    for hook in _THEME_HOOKS:
+        fn = hook() if callable(hook) else None
+        if fn is None:
+            continue
+        try:
+            fn()
+            live.append(hook)
+        except Exception:
+            pass
+    _THEME_HOOKS[:] = live
+
+
 def apply_theme_to_registry():
     """Walk registry and push new palette values into every live widget."""
     live = []
@@ -158,6 +184,7 @@ def apply_theme_to_registry():
         except Exception:
             pass
     _THEME_REGISTRY[:] = live
+    _run_theme_hooks()
 
 
 # ── Debounce helper ───────────────────────────────────────────────────────────
@@ -1080,9 +1107,25 @@ class LegalQAPanel(ctk.CTkFrame):
         self.engine = engine
 
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=40, pady=(40, 20))
-        ctk.CTkLabel(header, text="Legal Intelligence", font=("Georgia", 24, "bold"),
-                     text_color=PALETTE["text_primary"]).pack(side="left")
+        header.pack(fill="x", padx=40, pady=(40, 8))
+        tr(ctk.CTkLabel(header, text="Legal Intelligence",
+                        font=("Georgia", 24, "bold"),
+                        text_color=PALETTE["text_primary"]),
+           text_color="text_primary").pack(side="left")
+
+        self._new_btn = ctk.CTkButton(
+            header, text="New conversation", width=150, height=28,
+            corner_radius=6, fg_color=PALETTE["surface_2"],
+            hover_color=PALETTE["border"], text_color=PALETTE["text_secondary"],
+            font=("Courier New", 10, "bold"), command=self.new_conversation)
+        tr(self._new_btn, fg_color="surface_2", hover_color="border",
+           text_color="text_secondary")
+        self._new_btn.pack(side="right", pady=4)
+
+        self._model_lbl = tr(ctk.CTkLabel(
+            self, text=self._model_line(), font=("Courier New", 10),
+            text_color=PALETTE["text_dim"], anchor="w"), text_color="text_dim")
+        self._model_lbl.pack(fill="x", padx=40, pady=(0, 10))
 
         self.chat_box = ctk.CTkTextbox(
             self, fg_color=PALETTE["surface"], border_color=PALETTE["border"],
@@ -1112,23 +1155,56 @@ class LegalQAPanel(ctk.CTkFrame):
         )
         self.submit_btn.pack(side="right", padx=10, pady=10)
 
+    def _model_line(self):
+        try:
+            llm = self.engine.llm
+            kind = " (reasoning)" if llm.looks_like_reasoner(llm.model) else ""
+            state = "ready" if llm.configured else "no API key \u2014 see Settings"
+            return (f"{llm.spec['label']} \u00b7 {llm.model}{kind} \u00b7 {state}"
+                    f"  |  searching {len(self.engine.records):,} records")
+        except Exception:
+            return ""
+
+    def new_conversation(self):
+        try:
+            self.engine.reset_chat()
+        except Exception:
+            pass
+        self.chat_box.configure(state="normal")
+        self.chat_box.delete("1.0", "end")
+        self.chat_box.configure(state="disabled")
+        self._model_lbl.configure(text=self._model_line())
+
     def handle_submission(self):
         query = self.input_field.get().strip()
         if not query:
             return
         self.input_field.delete(0, "end")
         self._append_to_chat(f"YOU: {query}\n")
-        self.submit_btn.configure(state="disabled", text="ANALYZING...")
+        self.submit_btn.configure(state="disabled", text="ANALYZING")
+        self._dots = 0
+        self._animate_wait()
         threading.Thread(target=self.run_ai, args=(query,), daemon=True).start()
+
+    def _animate_wait(self):
+        if self.submit_btn.cget("state") != "disabled":
+            return
+        self._dots = (self._dots + 1) % 4
+        self.submit_btn.configure(text="ANALYZING" + "." * self._dots)
+        self._wait_job = self.after(400, self._animate_wait)
 
     def run_ai(self, query):
         try:
             response = self.engine.query_ai(query)
             self.after(0, self._append_to_chat, f"EXECUTIVE INSIGHT: {response}\n\n")
         except Exception as e:
-            self.after(0, self._append_to_chat, f"SYSTEM ERROR: {str(e)}\n\n")
+            self.after(0, self._append_to_chat, f"SYSTEM: {str(e)}\n\n")
         finally:
-            self.after(0, lambda: self.submit_btn.configure(state="normal", text="SUBMIT INQUIRY"))
+            self.after(0, self._finish)
+
+    def _finish(self):
+        self.submit_btn.configure(state="normal", text="SUBMIT INQUIRY")
+        self._model_lbl.configure(text=self._model_line())
 
     def _append_to_chat(self, message):
         self.chat_box.configure(state="normal")
@@ -1271,6 +1347,27 @@ class BillsPanel(ctk.CTkFrame):
         self._search_entry.bind("<KeyRelease>", lambda e: self._bills_debouncer.call(
             self._search_entry, self._apply_filter))
 
+        # Status filter — the one distinction that matters in this data
+        self._status_var = ctk.StringVar(value="Any status")
+        self._status_menu = ctk.CTkOptionMenu(
+            bar, variable=self._status_var,
+            values=["Any status", "No later action",
+                    "Revoked or superseded", "Amended"],
+            width=185, height=32, corner_radius=6,
+            fg_color=PALETTE["surface_2"],
+            button_color=PALETTE["border"],
+            button_hover_color=PALETTE["accent_dim"],
+            dropdown_fg_color=PALETTE["surface_2"],
+            dropdown_text_color=PALETTE["text_primary"],
+            dropdown_hover_color=PALETTE["border"],
+            text_color=PALETTE["text_primary"],
+            font=("Courier New", 11),
+            command=lambda _: self._apply_filter()
+        )
+        tr(self._status_menu, fg_color="surface_2", button_color="border",
+           text_color="text_primary")
+        self._status_menu.pack(side="right", padx=(6, 12), pady=8)
+
         # Type filter
         self._type_var = ctk.StringVar(value="All Types")
         self._type_menu = ctk.CTkOptionMenu(
@@ -1288,7 +1385,9 @@ class BillsPanel(ctk.CTkFrame):
             font=("Courier New", 11),
             command=lambda _: self._apply_filter()
         )
-        self._type_menu.pack(side="right", padx=(6, 12), pady=8)
+        tr(self._type_menu, fg_color="surface_2", button_color="border",
+           text_color="text_primary")
+        self._type_menu.pack(side="right", padx=(6, 0), pady=8)
 
         ctk.CTkButton(
             bar, text="Clear",
@@ -1299,27 +1398,55 @@ class BillsPanel(ctk.CTkFrame):
             command=self._clear_search
         ).pack(side="right", padx=(0, 6), pady=8)
 
-        # ── Column headers ────────────────────────────────────────────────
-        col_hdr = ctk.CTkFrame(self, fg_color="transparent")
-        col_hdr.pack(fill="x", padx=40, pady=(0, 4))
-        col_hdr.columnconfigure(0, weight=0, minsize=70)
-        col_hdr.columnconfigure(1, weight=3)
-        col_hdr.columnconfigure(2, weight=1, minsize=110)
-        col_hdr.columnconfigure(3, weight=1, minsize=110)
+        # ── Results table ─────────────────────────────────────────────────
+        # A native ttk.Treeview instead of a stack of composite widgets: the
+        # whole result set goes in at once, scrolling is native, and columns
+        # sort on click.
+        table_wrap = ctk.CTkFrame(self, fg_color=PALETTE["surface"],
+                                  corner_radius=8, border_width=1,
+                                  border_color=PALETTE["border"])
+        table_wrap.pack(fill="both", expand=True, padx=40, pady=(0, 8))
+        tr(table_wrap, fg_color="surface", border_color="border")
 
-        for i, label in enumerate(("EO #", "TITLE", "TYPE", "SIGNED")):
-            ctk.CTkLabel(col_hdr, text=label,
-                         font=("Courier New", 9, "bold"),
-                         text_color=PALETTE["text_dim"], anchor="w"
-                         ).grid(row=0, column=i, sticky="w", padx=6)
+        self._tree_style = ttk.Style()
+        try:
+            self._tree_style.theme_use("clam")   # the theme that honours colours
+        except Exception:
+            pass
 
-        # ── Results list ──────────────────────────────────────────────────
-        self._list_frame = ctk.CTkScrollableFrame(
-            self, fg_color=PALETTE["surface"],
-            corner_radius=8, border_width=1, border_color=PALETTE["border"],
-            scrollbar_button_color=PALETTE["border"],
-        )
-        self._list_frame.pack(fill="both", expand=True, padx=40, pady=(0, 8))
+        cols = ("eo", "title", "type", "signed")
+        self._tree = ttk.Treeview(table_wrap, columns=cols, show="headings",
+                                  selectmode="browse", style="EI.Treeview")
+        labels = {"eo": "EO #", "title": "TITLE", "type": "TYPE", "signed": "SIGNED"}
+        widths = {"eo": 78, "title": 620, "type": 150, "signed": 110}
+        for c in cols:
+            self._tree.heading(c, text=labels[c], anchor="w",
+                               command=lambda col=c: self._sort_by(col))
+            self._tree.column(c, width=widths[c], minwidth=60, anchor="w",
+                              stretch=(c == "title"))
+
+        vsb = ttk.Scrollbar(table_wrap, orient="vertical",
+                            command=self._tree.yview, style="EI.Vertical.TScrollbar")
+        self._tree.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y", padx=(0, 2), pady=2)
+        self._tree.pack(side="left", fill="both", expand=True, padx=(2, 0), pady=2)
+
+        self._tree.bind("<<TreeviewSelect>>", self._on_row_select)
+        self._tree.bind("<Double-1>", self._open_selected)
+        self._tree.bind("<Return>", self._open_selected)
+
+        self._empty_lbl = ctk.CTkLabel(
+            table_wrap, text="", font=("Courier New", 12), justify="left",
+            wraplength=620, text_color=PALETTE["text_dim"])
+        tr(self._empty_lbl, text_color="text_dim")
+
+        self._sort_col, self._sort_desc = None, False
+        self._fill_job, self._fill_gen = None, 0
+        self._style_tree()
+        on_theme(self._style_tree)
+
+        # Ctrl+F jumps to the search box from anywhere in the panel.
+        self.bind_all("<Control-f>", lambda e: self._focus_search())
 
         # ── Detail panel (hidden until a row is clicked) ──────────────────
         self._detail_panel = ctk.CTkFrame(
@@ -1351,6 +1478,16 @@ class BillsPanel(ctk.CTkFrame):
         )
         self._detail_notes.pack(fill="x", padx=20, pady=(0, 16))
 
+        self._detail_open = ctk.CTkButton(
+            self._detail_panel, text="Open source", width=110, height=24,
+            corner_radius=4,
+            fg_color=PALETTE["accent"], hover_color=PALETTE["accent_dim"],
+            text_color=PALETTE["bg"], font=("Courier New", 10, "bold"),
+            command=self._open_selected)
+        tr(self._detail_open, fg_color="accent", hover_color="accent_dim",
+           text_color="bg")
+        self._detail_open.place(relx=1.0, y=8, anchor="ne", x=-92)
+
         close_btn = ctk.CTkButton(
             self._detail_panel, text="✕ Close", width=70, height=24,
             corner_radius=4,
@@ -1381,6 +1518,47 @@ class BillsPanel(ctk.CTkFrame):
         if not hasattr(self, "_load_reports"):
             self._load_reports = {}
         self._load_reports[name] = report
+        return self._prepare(rows)
+
+    @staticmethod
+    def _prepare(rows):
+        """
+        Precompute per row, once, what filtering and drawing need every time:
+        a lowercase search blob, the display tuple, a sort key, and whether the
+        order has been revoked. Keystroke filtering then costs one substring
+        test per row instead of six lookups and four strips.
+        """
+        for row in rows:
+            title = (row.get("title") or "").strip()
+            eo    = str(row.get("executive_order_number") or "").strip()
+            sub   = (row.get("subtype") or "").strip()
+            notes = (row.get("disposition_notes") or "").strip()
+            date  = ((row.get("signing_date") or "").strip()
+                     or (row.get("publication_date") or "").strip())
+
+            low = notes.lower()
+            row["_blob"] = f"{title}\n{eo}\n{notes}".lower()
+            row["_sub"] = sub
+            # "Amends:" is what this order did to others; only "Amended by"
+            # describes something that happened to it.
+            if "revoked by" in low or "superseded by" in low:
+                row["_status"] = "revoked"
+            elif "amended by" in low:
+                row["_status"] = "amended"
+            else:
+                row["_status"] = "none"
+            row["_revoked"] = row["_status"] == "revoked"
+            row["_display"] = (eo or "\u2014", title or "(untitled)",
+                               sub or "Document", date)
+            # Numbers like "7677-A" must sort next to 7677, and rows with no
+            # number belong at the end rather than the front.
+            digits = ""
+            for ch in eo:
+                if ch.isdigit():
+                    digits += ch
+                elif digits:
+                    break
+            row["_eo_sort"] = (int(digits), eo) if digits else (10 ** 9, eo)
         return rows
 
     # ── Tab selection ─────────────────────────────────────────────────────────
@@ -1408,63 +1586,129 @@ class BillsPanel(ctk.CTkFrame):
         if name not in self._csv_cache:
             self._csv_cache[name] = self._load_csv(name)
         self._all_rows = self._csv_cache[name]
+
+        # Offer only the document types this tab actually holds, so the menu
+        # never lists options that can't match anything.
+        types = sorted({r["_sub"] for r in self._all_rows if r["_sub"]})
+        self._type_menu.configure(values=["All Types"] + types)
+        if len(types) > 1:
+            self._type_menu.pack(side="right", padx=(6, 0), pady=8)
+        else:
+            self._type_menu.pack_forget()
+
         self._search_entry.delete(0, "end")
         self._type_var.set("All Types")
+        self._status_var.set("Any status")
+        self._sort_col, self._sort_desc = None, False
         self._apply_filter()
+
+    def _focus_search(self):
+        try:
+            self._search_entry.focus_set()
+        except Exception:
+            pass
 
     # ── Filter / search ───────────────────────────────────────────────────────
     def _apply_filter(self):
         q      = self._search_entry.get().strip().lower()
         t_filt = self._type_var.get()
+        s_filt = self._status_var.get()
+        rows   = self._all_rows
 
-        results = []
-        for row in self._all_rows:
-            subtype = row.get("subtype", "").strip()
-            title   = row.get("title", "")
-            eo_num  = str(row.get("executive_order_number", ""))
-            notes   = row.get("disposition_notes", "")
+        if t_filt != "All Types":
+            rows = [r for r in rows if r["_sub"] == t_filt]
 
-            # Type filter
-            if t_filt != "All Types":
-                if t_filt == "Executive Order" and "Executive Order" not in subtype:
-                    continue
-                elif t_filt == "Proclamation" and "Proclamation" not in subtype:
-                    continue
-                elif t_filt == "Memorandum" and "Memorandum" not in subtype:
-                    continue
-                elif t_filt == "Notice" and "Notice" not in subtype:
-                    continue
-                elif t_filt == "Other" and subtype in ("Executive Order", "Proclamation",
-                                                        "Memorandum", "Notice"):
-                    continue
+        wanted = {"No later action": "none",
+                  "Revoked or superseded": "revoked",
+                  "Amended": "amended"}.get(s_filt)
+        if wanted:
+            rows = [r for r in rows if r["_status"] == wanted]
 
-            # Text search
-            if q and q not in title.lower() and q not in eo_num and q not in notes.lower():
-                continue
+        if q:
+            rows = [r for r in rows if q in r["_blob"]]
 
-            results.append(row)
-
-        self._filtered = results
+        self._filtered = rows
+        if self._sort_col:
+            self._apply_sort()
         self._render_rows()
 
     def _clear_search(self):
         self._search_entry.delete(0, "end")
         self._type_var.set("All Types")
+        self._status_var.set("Any status")
+        self._sort_col, self._sort_desc = None, False
         self._apply_filter()
 
-    PAGE_SIZE = 150   # rows rendered per batch
+    # ── Sorting ───────────────────────────────────────────────────────────────
+    def _sort_by(self, col):
+        self._sort_desc = (col == self._sort_col) and not self._sort_desc
+        self._sort_col = col
+        self._apply_sort()
+        self._render_rows()
 
-    # ── Render rows into the list frame ──────────────────────────────────────
+    def _apply_sort(self):
+        keys = {
+            "eo":     lambda r: r["_eo_sort"],
+            "title":  lambda r: r["_display"][1].lower(),
+            "type":   lambda r: r["_display"][2].lower(),
+            "signed": lambda r: r["_display"][3],
+        }
+        key = keys.get(self._sort_col)
+        if key:
+            self._filtered = sorted(self._filtered, key=key,
+                                    reverse=self._sort_desc)
+        arrow = " \u25be" if self._sort_desc else " \u25b4"
+        for c, label in (("eo", "EO #"), ("title", "TITLE"),
+                         ("type", "TYPE"), ("signed", "SIGNED")):
+            self._tree.heading(c, text=label + (arrow if c == self._sort_col else ""))
+
+    # ── Rendering ─────────────────────────────────────────────────────────────
+    def _style_tree(self):
+        st = self._tree_style
+        st.configure("EI.Treeview",
+                     background=PALETTE["surface"],
+                     fieldbackground=PALETTE["surface"],
+                     foreground=PALETTE["text_primary"],
+                     borderwidth=0, relief="flat", rowheight=27,
+                     font=("Georgia", 11))
+        st.configure("EI.Treeview.Heading",
+                     background=PALETTE["surface_2"],
+                     foreground=PALETTE["text_dim"],
+                     relief="flat", borderwidth=0, padding=(8, 7),
+                     font=("Courier New", 9, "bold"))
+        st.map("EI.Treeview.Heading",
+               background=[("active", PALETTE["border"])],
+               foreground=[("active", PALETTE["accent"])])
+        st.map("EI.Treeview",
+               background=[("selected", PALETTE["surface_2"])],
+               foreground=[("selected", PALETTE["accent"])])
+        st.layout("EI.Treeview", [("EI.Treeview.treearea", {"sticky": "nswe"})])
+        st.configure("EI.Vertical.TScrollbar",
+                     background=PALETTE["border"], troughcolor=PALETTE["surface"],
+                     bordercolor=PALETTE["surface"], arrowcolor=PALETTE["text_dim"],
+                     relief="flat", borderwidth=0)
+        st.map("EI.Vertical.TScrollbar",
+               background=[("active", PALETTE["accent_dim"])])
+        self._tree.tag_configure("odd", background=PALETTE["surface"])
+        self._tree.tag_configure("even", background=PALETTE["surface_2"])
+        # Revoked or superseded orders read at a glance.
+        self._tree.tag_configure("revoked", foreground=PALETTE["danger"])
+
     def _render_rows(self):
-        for w in self._list_frame.winfo_children():
-            w.destroy()
+        # Cancel any in-flight fill from a previous keystroke.
+        self._fill_gen += 1
+        if self._fill_job is not None:
+            try:
+                self.after_cancel(self._fill_job)
+            except Exception:
+                pass
+            self._fill_job = None
 
-        color  = self.PARTY_COLORS.get(self._current_president, PALETTE["accent"])
-        total  = len(self._all_rows)
-        shown  = len(self._filtered)
+        self._tree.delete(*self._tree.get_children())
+
+        total, shown = len(self._all_rows), len(self._filtered)
         self._count_lbl.configure(
-            text=f"  {shown:,} of {total:,} RECORDS — {self._current_president}  "
-        )
+            text=f"  {shown:,} of {total:,} RECORDS \u2014 {self._current_president}  ")
 
         if not self._filtered:
             report = getattr(self, "_load_reports", {}).get(self._current_president)
@@ -1472,98 +1716,67 @@ class BillsPanel(ctk.CTkFrame):
                 msg = ("Could not load " + str(report.get("file", "")) + "\n\n"
                        + str(report.get("error", "")) + "\n\n"
                        + "Point Settings -> Data sources at the right folder, "
-                         "then press Rescan sources.")
+                         "then press Rescan sources. Settings -> Indexing can "
+                         "also pull this database straight from the Federal "
+                         "Register.")
             elif not self._all_rows:
                 msg = ("No records loaded for " + str(self._current_president)
-                       + ". Check Settings -> Data sources.")
+                       + ".\n\nSettings -> Indexing can pull it from the "
+                         "Federal Register.")
             else:
-                msg = "No records match your search."
-            ctk.CTkLabel(self._list_frame, text=msg,
-                         font=("Courier New", 12), justify="left",
-                         wraplength=760,
-                         text_color=PALETTE["text_dim"]).pack(pady=40, padx=20)
+                msg = "Nothing matches that search."
+            self._empty_lbl.configure(text=msg)
+            self._empty_lbl.place(relx=0.5, rely=0.5, anchor="center")
             return
 
-        self._render_page(0, color)
+        self._empty_lbl.place_forget()
+        # First screenful immediately, the rest in background chunks so typing
+        # never blocks on a 6,000-row archive.
+        self._fill(0, self._fill_gen)
 
-    def _render_page(self, start, color):
-        batch = self._filtered[start : start + self.PAGE_SIZE]
-        for row in batch:
-            self._make_row(row, color)
+    CHUNK = 400
 
-        end = start + len(batch)
-        if end < len(self._filtered):
-            remaining = len(self._filtered) - end
-            ctk.CTkButton(
-                self._list_frame,
-                text=f"Load {min(self.PAGE_SIZE, remaining):,} more  ({remaining:,} remaining)",
-                height=32, corner_radius=6,
-                fg_color=PALETTE["surface_2"], hover_color=PALETTE["border"],
-                text_color=PALETTE["accent"],
-                font=("Courier New", 10, "bold"),
-                command=lambda s=end, c=color: self._load_more(s, c)
-            ).pack(fill="x", padx=8, pady=8)
+    def _fill(self, start, generation):
+        if generation != self._fill_gen:
+            return
+        insert = self._tree.insert
+        batch = self._filtered[start:start + self.CHUNK]
+        for offset, row in enumerate(batch):
+            i = start + offset
+            tags = ("even" if i % 2 else "odd",)
+            if row["_revoked"]:
+                tags += ("revoked",)
+            insert("", "end", iid=str(i), values=row["_display"], tags=tags)
 
-    def _load_more(self, start, color):
-        # Remove the "Load more" button then append next page
-        children = self._list_frame.winfo_children()
-        if children:
-            children[-1].destroy()  # remove Load more btn
-        self._render_page(start, color)
+        nxt = start + len(batch)
+        if nxt < len(self._filtered):
+            self._fill_job = self.after(1, self._fill, nxt, generation)
+        else:
+            self._fill_job = None
 
-    def _make_row(self, row, color):
-        eo_num  = str(row.get("executive_order_number", "")).strip() or "—"
-        title   = row.get("title", "Untitled").strip()
-        subtype = row.get("subtype", "").strip() or "Document"
-        signed  = row.get("signing_date", "").strip() or row.get("publication_date", "").strip()
+    # ── Row interaction ───────────────────────────────────────────────────────
+    def _selected_row(self):
+        sel = self._tree.selection()
+        if not sel:
+            return None
+        try:
+            return self._filtered[int(sel[0])]
+        except (ValueError, IndexError):
+            return None
 
-        frame = ctk.CTkFrame(self._list_frame, fg_color="transparent",
-                              cursor="hand2")
-        frame.pack(fill="x", pady=1)
-        frame.columnconfigure(0, weight=0, minsize=70)
-        frame.columnconfigure(1, weight=3)
-        frame.columnconfigure(2, weight=1, minsize=110)
-        frame.columnconfigure(3, weight=1, minsize=110)
+    def _on_row_select(self, _event=None):
+        row = self._selected_row()
+        if row is not None:
+            self._show_detail(row)
 
-        ctk.CTkLabel(frame, text=eo_num,
-                     font=("Courier New", 11, "bold"),
-                     text_color=color, anchor="w"
-                     ).grid(row=0, column=0, sticky="w", padx=(10, 4), pady=6)
-
-        ctk.CTkLabel(frame, text=title,
-                     font=("Georgia", 12),
-                     text_color=PALETTE["text_primary"], anchor="w"
-                     ).grid(row=0, column=1, sticky="ew", padx=4, pady=6)
-
-        ctk.CTkLabel(frame, text=subtype,
-                     font=("Courier New", 10),
-                     text_color=PALETTE["text_secondary"], anchor="w"
-                     ).grid(row=0, column=2, sticky="w", padx=4, pady=6)
-
-        ctk.CTkLabel(frame, text=signed,
-                     font=("Courier New", 10),
-                     text_color=PALETTE["text_dim"], anchor="w"
-                     ).grid(row=0, column=3, sticky="w", padx=(4, 10), pady=6)
-
-        # Divider
-        ctk.CTkFrame(self._list_frame, height=1,
-                     fg_color=PALETTE["border"], corner_radius=0).pack(fill="x", padx=8)
-
-        # Click to expand detail
-        def _click(e, r=row):
-            self._show_detail(r)
-
-        for w in frame.winfo_children():
-            w.bind("<Button-1>", _click)
-        frame.bind("<Button-1>", _click)
-
-        # Hover effect
-        def _enter(e, f=frame):
-            f.configure(fg_color=PALETTE["surface_2"])
-        def _leave(e, f=frame):
-            f.configure(fg_color="transparent")
-        frame.bind("<Enter>", _enter)
-        frame.bind("<Leave>", _leave)
+    def _open_selected(self, _event=None):
+        row = self._selected_row()
+        url = (row or {}).get("html_url", "").strip()
+        if url:
+            try:
+                webbrowser.open_new_tab(url)
+            except Exception:
+                pass
 
     # ── Detail panel ──────────────────────────────────────────────────────────
     def _show_detail(self, row):
@@ -1576,13 +1789,27 @@ class BillsPanel(ctk.CTkFrame):
         html    = row.get("html_url", "").strip()
 
         self._detail_title.configure(text=title or "Untitled")
-        meta = f"EO #{eo_num}  •  {subtype}  •  Signed: {signed}  •  Published: {pub}"
-        if html:
-            meta += f"  •  {html}"
-        self._detail_meta.configure(text=meta)
-        self._detail_notes.configure(
-            text=f"Disposition: {notes}" if notes else "No disposition notes recorded."
-        )
+
+        bits = []
+        if eo_num:
+            bits.append("EO " + eo_num)
+        if subtype:
+            bits.append(subtype)
+        bits.append("Signed " + signed if signed else "Signing date not recorded")
+        if pub:
+            bits.append("Published " + pub)
+        self._detail_meta.configure(text="   •   ".join(bits))
+
+        if notes:
+            self._detail_notes.configure(text=notes,
+                                         text_color=PALETTE["danger"]
+                                         if row.get("_revoked")
+                                         else PALETTE["text_secondary"])
+        else:
+            self._detail_notes.configure(text="No later action recorded.",
+                                         text_color=PALETTE["text_dim"])
+
+        self._detail_open.configure(state="normal" if html else "disabled")
         self._detail_panel.pack(fill="x", padx=40, pady=(0, 16))
 
     def _hide_detail(self):
