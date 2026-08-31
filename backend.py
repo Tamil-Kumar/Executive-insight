@@ -62,6 +62,7 @@ DEFAULT_SETTINGS = {
     "openrouter_model":  "openai/gpt-4o-mini",
 
     "ai_model":          "gpt-3.5-turbo-instruct",   # legacy key, kept for compat
+    "live_data":         "federal_register",   # off | federal_register | federal_register_web
     "openrouter_site":   "https://executive-insight.local",
     "openrouter_title":  "Executive Insight",
 }
@@ -333,6 +334,117 @@ FR_PRESIDENTS = {
 }
 
 
+FR_DOC_API = "https://www.federalregister.gov/api/v1/documents/{}.json"
+WEB_CACHE_PATH = os.path.join(APP_DIR, "ei_webcache.json")
+
+# Fetched text is cached on disk. Documents never change once published, so the
+# only thing worth expiring is a search result list.
+_WEB_CACHE = None
+SEARCH_TTL = 60 * 60 * 6          # 6 hours
+TEXT_TTL = 60 * 60 * 24 * 90      # 90 days
+
+
+def _web_cache() -> dict:
+    global _WEB_CACHE
+    if _WEB_CACHE is None:
+        _WEB_CACHE = load_json(WEB_CACHE_PATH, {})
+    return _WEB_CACHE
+
+
+def _cache_get(key: str, ttl: int):
+    entry = _web_cache().get(key)
+    if not entry:
+        return None
+    if time.time() - entry.get("t", 0) > ttl:
+        return None
+    return entry.get("v")
+
+
+def _cache_put(key: str, value):
+    _web_cache()[key] = {"t": time.time(), "v": value}
+    write_json(WEB_CACHE_PATH, _WEB_CACHE)
+
+
+_TAG_RE = re.compile(r"<[^>]+>")
+_WS_RE = re.compile(r"[ \t]*\n\s*\n\s*")
+
+
+def _strip_html(html: str) -> str:
+    text = re.sub(r"(?is)<(script|style).*?</\1>", " ", html or "")
+    text = re.sub(r"(?i)<(/p|/div|br\s*/?|/h[1-6])>", "\n", text)
+    text = _TAG_RE.sub("", text)
+    for entity, char in (("&nbsp;", " "), ("&amp;", "&"), ("&lt;", "<"),
+                         ("&gt;", ">"), ("&quot;", '"'), ("&#8217;", "'"),
+                         ("&#8220;", '"'), ("&#8221;", '"'), ("&mdash;", "—")):
+        text = text.replace(entity, char)
+    return _WS_RE.sub("\n\n", text).strip()
+
+
+def _fetch_text(url: str, timeout: int = 30) -> str:
+    req = urllib.request.Request(
+        url, headers={"User-Agent": "Executive Insight (research tool)"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read()
+    return raw.decode("utf-8", "replace")
+
+
+def fr_search_live(query: str, limit: int = 6, timeout: int = 25) -> list:
+    """Search federalregister.gov right now. Catches anything newer than the CSVs."""
+    key = f"search::{query.lower().strip()}::{limit}"
+    hit = _cache_get(key, SEARCH_TTL)
+    if hit is not None:
+        return hit
+
+    params = [("conditions[type][]", "PRESDOCU"),
+              ("conditions[term]", query),
+              ("per_page", str(limit)), ("order", "relevance")]
+    params += [("fields[]", f) for f in CSV_HEADER]
+    data = _fr_get(params, timeout=timeout)
+    rows = [{f: ("" if item.get(f) is None else str(item.get(f)))
+             for f in CSV_HEADER} for item in (data.get("results") or [])]
+    _cache_put(key, rows)
+    return rows
+
+
+def fr_document_text(document_number: str, max_chars: int = 9000,
+                     timeout: int = 30) -> str:
+    """
+    The plain text of one document. This is the piece the CSV archive has never
+    had — the metadata says an order exists, this says what it does.
+    """
+    document_number = (document_number or "").strip()
+    if not document_number:
+        return ""
+    key = f"text::{document_number}::{max_chars}"
+    hit = _cache_get(key, TEXT_TTL)
+    if hit is not None:
+        return hit
+
+    meta = _fr_get_url(FR_DOC_API.format(urllib.parse.quote(document_number)),
+                       [("fields[]", "raw_text_url"), ("fields[]", "body_html_url")],
+                       timeout=timeout)
+    text = ""
+    if meta.get("raw_text_url"):
+        text = _fetch_text(meta["raw_text_url"], timeout=timeout)
+    elif meta.get("body_html_url"):
+        text = _strip_html(_fetch_text(meta["body_html_url"], timeout=timeout))
+
+    text = _WS_RE.sub("\n\n", (text or "").strip())
+    if len(text) > max_chars:
+        text = text[:max_chars].rsplit("\n", 1)[0] + "\n[... text truncated ...]"
+    _cache_put(key, text)
+    return text
+
+
+def _fr_get_url(url: str, params, timeout: int = 30) -> dict:
+    full = url + ("?" + urllib.parse.urlencode(params, doseq=True) if params else "")
+    req = urllib.request.Request(
+        full, headers={"User-Agent": "Executive Insight (research tool)",
+                       "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
 def _fr_get(params, timeout=60) -> dict:
     url = FR_API + "?" + urllib.parse.urlencode(params, doseq=True)
     req = urllib.request.Request(
@@ -548,10 +660,15 @@ class LLMClient:
                                 if isinstance(p, dict))
         return (content or choice.get("text") or ""), (reasoning or "")
 
-    def _build_payload(self, messages, max_tokens, temperature):
+    def _build_payload(self, messages, max_tokens, temperature, web=False):
         model = self.model
         payload = {"model": model, "messages": messages}
         reasoner = self.looks_like_reasoner(model)
+
+        # OpenRouter can run a web search alongside any model and hand the
+        # results to it before it answers.
+        if web and self.provider == "openrouter":
+            payload["plugins"] = [{"id": "web", "max_results": 3}]
 
         # Thinking tokens are billed against the same budget as the answer, so
         # a normal ceiling can leave nothing for the reply.
@@ -572,7 +689,7 @@ class LLMClient:
     # -- generation ----------------------------------------------------------
     def complete(self, system: str, user: str,
                  max_tokens: int = 800, temperature: float = 0.0,
-                 history=None) -> str:
+                 history=None, web: bool = False) -> str:
         model = self.model
         history = list(history or [])
 
@@ -598,11 +715,14 @@ class LLMClient:
         budget = max_tokens
         for attempt in (1, 2):
             data = self._post("/chat/completions",
-                              self._build_payload(messages, budget, temperature),
-                              timeout=180 if reasoner else 90)
+                              self._build_payload(messages, budget, temperature,
+                                                  web=web),
+                              timeout=180 if (reasoner or web) else 90)
             choice = (data.get("choices") or [{}])[0]
             raw, reasoning = self._extract(choice)
             answer = self.strip_thinking(raw)
+            if answer:
+                answer = self._append_citations(answer, choice)
             self.last_reasoning = reasoning or self.THINK_TAGS.findall(raw or "")
 
             if answer:
@@ -627,6 +747,21 @@ class LLMClient:
             raise LLMError(f"'{model}' returned an empty response "
                            f"(finish_reason: {finish}).")
         return ""
+
+    @staticmethod
+    def _append_citations(answer: str, choice: dict) -> str:
+        """Surface the sources a web search actually used."""
+        msg = choice.get("message") or {}
+        urls = []
+        for note in (msg.get("annotations") or []):
+            cite = note.get("url_citation") or {}
+            url = cite.get("url")
+            if url and url not in urls:
+                urls.append(url)
+        if not urls:
+            return answer
+        lines = "\n".join("  " + u for u in urls[:5])
+        return answer + "\n\nWeb sources:\n" + lines
 
     def test(self):
         """Return (ok: bool, message: str)."""
@@ -760,6 +895,32 @@ the database is not loaded rather than saying no such orders exist. Those are \
 completely different claims.
   - The Historical database overlaps the per-president ones, so the same order \
 can appear twice. Report it once.
+
+LIVE MATERIAL
+Some messages carry blocks marked LIVE, fetched from federalregister.gov at the \
+moment you were asked. Treat them as more current than the archive: the CSVs \
+have a cutoff and live results do not. Where the two disagree about a date, a \
+citation or a status, the live block wins, and it is worth saying briefly that \
+the archive copy differs. A live block flagged NOT IN THE LOCAL ARCHIVE is a \
+document published since the CSVs were built; say so when you cite it.
+
+A block marked LIVE FULL TEXT contains the real text of the order. When you \
+have it, the restriction above is lifted for that document: you may describe \
+what it actually provides, section by section, and quote short passages. These \
+are U.S. government works in the public domain. Quote sparingly and \
+purposefully, a sentence or two where the exact wording matters, and summarise \
+the rest. Never present the text of one order as the text of another, and if \
+the excerpt is truncated say so instead of guessing at the ending.
+
+If a message says the live lookup failed or returned nothing, answer from the \
+archive and mention in one line that you could not reach the live source, so \
+the reader knows the answer may not reflect the last few weeks.
+
+Web search results, when present, come from the open internet rather than the \
+Federal Register. They are useful for context and reporting, but they are not \
+authoritative for what a document says: prefer the Federal Register text and \
+metadata whenever both are available, and attribute anything that came from \
+the wider web to its source.
 
 HOW TO ANSWER
 Lead with the direct answer in a sentence or two, then the supporting records. \
@@ -1166,6 +1327,83 @@ class LegalEngine:
         return "\n".join(f"{k}: {v}" for k, v in row.items()
                          if v and not str(k).startswith("_"))
 
+    # -- live internet lookup for the AI -------------------------------------
+    LIVE_MODES = ("off", "federal_register", "federal_register_web")
+
+    @property
+    def live_mode(self) -> str:
+        mode = str(self.settings.get("live_data", "federal_register")).lower()
+        return mode if mode in self.LIVE_MODES else "federal_register"
+
+    def live_lookup(self, user_query: str, max_docs: int = 4,
+                    max_text: int = 2, timeout: int = 25):
+        """
+        Go out to federalregister.gov for this question. Two things come back
+        that the local archive cannot provide: documents published since the
+        CSVs were built, and the actual text of an order rather than a title.
+
+        Returns (blocks, note). Never raises — offline just means no blocks.
+        """
+        blocks, seen = [], set()
+        wanted_texts = []
+
+        # Anything the question names by number gets its full text pulled.
+        for num in dict.fromkeys(_EO_RE.findall(user_query)):
+            for rid in self.by_eo.get(num, ())[:1]:
+                doc = str(self.records[rid].get("document_number", "")).strip()
+                if doc:
+                    wanted_texts.append((num, doc, self.records[rid]))
+
+        try:
+            fresh = fr_search_live(user_query, limit=max_docs, timeout=timeout)
+        except urllib.error.URLError as e:
+            return [], f"Live lookup unavailable ({e.reason}); archive only."
+        except Exception as e:
+            return [], f"Live lookup failed ({type(e).__name__}); archive only."
+
+        known = {self._dedupe_key(r) for r in self.records}
+        for row in fresh:
+            key = self._dedupe_key(row)
+            if key in seen:
+                continue
+            seen.add(key)
+            is_new = key not in known
+            eo = row.get("executive_order_number", "").strip()
+            head = (f"[LIVE] " + (f"EO {eo}" if eo else "(no EO number)")
+                    + f" \u00b7 signed {row.get('signing_date') or '\u2014'}"
+                    + (" \u00b7 NOT IN THE LOCAL ARCHIVE" if is_new else ""))
+            body = [head,
+                    f"    Title: {row.get('title', '')}",
+                    f"    Notes: {row.get('disposition_notes') or '(none recorded)'}"]
+            if row.get("html_url"):
+                body.append(f"    Link: {row['html_url']}")
+            blocks.append("\n".join(body))
+            if len(wanted_texts) < max_text and row.get("document_number"):
+                wanted_texts.append((eo, row["document_number"], row))
+
+        # Full text for at most a couple of documents — it is the expensive part.
+        pulled = 0
+        for eo, doc, row in wanted_texts:
+            if pulled >= max_text:
+                break
+            try:
+                text = fr_document_text(doc, timeout=timeout)
+            except Exception:
+                continue
+            if not text:
+                continue
+            pulled += 1
+            blocks.append(
+                f"[LIVE FULL TEXT] EO {eo or '\u2014'} \u00b7 "
+                f"{row.get('title', '')}\n"
+                f"Retrieved from federalregister.gov just now. This is the "
+                f"actual document text:\n\n{text}")
+
+        note = ""
+        if not blocks:
+            note = "Live lookup returned nothing; answering from the archive."
+        return blocks, note
+
     # -- AI ------------------------------------------------------------------
     def coverage_block(self) -> str:
         """Exact per-database totals and date spans — the model's ground truth."""
@@ -1227,23 +1465,42 @@ class LegalEngine:
         return "\n".join(out)
 
     def build_context(self, user_query: str, k: int = 25,
-                      char_budget: int = 14000):
+                      char_budget: int = 14000, live=None):
+        # Live material is worth more than another twenty archive rows, so it
+        # gets its budget first and the local sample fills what's left.
+        live_blocks, live_note = [], ""
+        if live is None:
+            live = self.live_mode != "off"
+        if live:
+            live_blocks, live_note = self.live_lookup(user_query)
+
+        live_text = "\n\n".join(live_blocks)
+        remaining = max(char_budget - len(live_text), 3000)
+
         hits = self.search(user_query, limit=k)
         blocks, used = [], 0
         for i, row in enumerate(hits, 1):
             block = self._record_block(row, i)
-            if used + len(block) > char_budget:
+            if used + len(block) > remaining:
                 break
             blocks.append(block)
             used += len(block)
 
         if blocks:
-            body = (f"TOP {len(blocks)} MATCHING RECORDS (a ranked sample, not "
-                    f"a complete set):\n\n" + "\n\n".join(blocks))
+            body = (f"TOP {len(blocks)} MATCHING ARCHIVE RECORDS (a ranked "
+                    f"sample, not a complete set):\n\n" + "\n\n".join(blocks))
         else:
-            body = ("TOP MATCHING RECORDS: none. Nothing in the loaded "
+            body = ("TOP MATCHING ARCHIVE RECORDS: none. Nothing in the loaded "
                     "databases matched this question.")
-        return self.coverage_block() + "\n\n" + body, hits
+
+        parts = [self.coverage_block(), body]
+        if live_text:
+            parts.append("LIVE FROM FEDERALREGISTER.GOV (fetched moments ago, "
+                         "authoritative and newer than the archive):\n\n"
+                         + live_text)
+        elif live and live_note:
+            parts.append("LIVE LOOKUP: " + live_note)
+        return "\n\n".join(parts), hits
 
     def query_ai(self, user_query: str, k: int = 25, use_history: bool = True) -> str:
         context, _ = self.build_context(user_query, k=k)
@@ -1252,7 +1509,8 @@ class LegalEngine:
         history = self.chat_history[-6:] if use_history else []
         answer = self.llm.complete(SYSTEM_PROMPT, prompt,
                                    max_tokens=1400, temperature=0,
-                                   history=history)
+                                   history=history,
+                                   web=(self.live_mode == "federal_register_web"))
         if use_history:
             # Store the question without its context so history stays cheap.
             self.chat_history.append({"role": "user", "content": user_query})

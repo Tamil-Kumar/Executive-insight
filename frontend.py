@@ -16,114 +16,114 @@ ctk.set_default_color_theme("blue")
 # ── Theme Presets ──────────────────────────────────────────────────────────────
 THEMES = {
     "Executive Dark": {
-        "bg":            "#0D0F14",
-        "surface":       "#13161E",
-        "surface_2":     "#1B1F2B",
-        "border":        "#252A38",
-        "accent":        "#C9A84C",
-        "accent_dim":    "#8A6E2F",
-        "text_primary":  "#E8E6DF",
-        "text_secondary":"#7A8099",
-        "text_dim":      "#3D4357",
-        "positive":      "#3DAA72",
-        "warning":       "#C9A84C",
-        "danger":        "#C95C4C",
-        "blue_soft":     "#3A6EA8",
-        "dem_blue":      "#1A4F8A",
-        "dem_light":     "#4A90D9",
-        "rep_red":       "#8A1A1A",
-        "rep_light":     "#D94A4A",
-        "ind_purple":    "#5A3A8A",
-        "ind_light":     "#9B72D4",
-        "ctk_mode":      "Dark",
+        "bg":              "#0B0D12",
+        "surface":         "#141821",
+        "surface_2":       "#222836",
+        "border":          "#3A4358",
+        "accent":          "#D4B45C",
+        "accent_dim":      "#9A7C36",
+        "text_primary":    "#F0EEE7",
+        "text_secondary":  "#AEB5C9",
+        "text_dim":        "#8A92A8",
+        "positive":        "#4FC98D",
+        "warning":         "#E2BE60",
+        "danger":          "#E87A6A",
+        "blue_soft":       "#3A6EA8",
+        "dem_blue":        "#1A4F8A",
+        "dem_light":       "#6FA9E8",
+        "rep_red":         "#8A1A1A",
+        "rep_light":       "#E8706E",
+        "ind_purple":      "#5A3A8A",
+        "ind_light":       "#9B72D4",
+        "ctk_mode":        "Dark",
     },
     "Midnight Blue": {
-        "bg":            "#070D1A",
-        "surface":       "#0D1628",
-        "surface_2":     "#132035",
-        "border":        "#1E2E4A",
-        "accent":        "#4FC3F7",
-        "accent_dim":    "#2A7DA8",
-        "text_primary":  "#E3EEF7",
-        "text_secondary":"#6A8BAA",
-        "text_dim":      "#2E3F55",
-        "positive":      "#43C98A",
-        "warning":       "#F7C948",
-        "danger":        "#E05252",
-        "blue_soft":     "#4FC3F7",
-        "dem_blue":      "#1A4F8A",
-        "dem_light":     "#4A90D9",
-        "rep_red":       "#8A1A1A",
-        "rep_light":     "#D94A4A",
-        "ind_purple":    "#5A3A8A",
-        "ind_light":     "#9B72D4",
-        "ctk_mode":      "Dark",
+        "bg":              "#060B16",
+        "surface":         "#0E1729",
+        "surface_2":       "#1A2740",
+        "border":          "#30445F",
+        "accent":          "#5CC9F7",
+        "accent_dim":      "#2F84B0",
+        "text_primary":    "#E6F0F8",
+        "text_secondary":  "#A4BBD2",
+        "text_dim":        "#7A93AE",
+        "positive":        "#4FD095",
+        "warning":         "#F7C948",
+        "danger":          "#F06A6A",
+        "blue_soft":       "#4FC3F7",
+        "dem_blue":        "#1A4F8A",
+        "dem_light":       "#6FA9E8",
+        "rep_red":         "#8A1A1A",
+        "rep_light":       "#E8706E",
+        "ind_purple":      "#5A3A8A",
+        "ind_light":       "#9B72D4",
+        "ctk_mode":        "Dark",
     },
     "Forest": {
-        "bg":            "#0A1209",
-        "surface":       "#111A10",
-        "surface_2":     "#182518",
-        "border":        "#243524",
-        "accent":        "#7EC850",
-        "accent_dim":    "#4E8230",
-        "text_primary":  "#E2ECD8",
-        "text_secondary":"#6A8A60",
-        "text_dim":      "#2E4228",
-        "positive":      "#50C87E",
-        "warning":       "#C8B450",
-        "danger":        "#C85050",
-        "blue_soft":     "#5088C8",
-        "dem_blue":      "#1A4F8A",
-        "dem_light":     "#4A90D9",
-        "rep_red":       "#8A1A1A",
-        "rep_light":     "#D94A4A",
-        "ind_purple":    "#5A3A8A",
-        "ind_light":     "#9B72D4",
-        "ctk_mode":      "Dark",
+        "bg":              "#080F07",
+        "surface":         "#111A10",
+        "surface_2":       "#1D2C1C",
+        "border":          "#334A2D",
+        "accent":          "#8AD45C",
+        "accent_dim":      "#548A34",
+        "text_primary":    "#E6EFDC",
+        "text_secondary":  "#A6C29A",
+        "text_dim":        "#7E9C74",
+        "positive":        "#58D08A",
+        "warning":         "#D2BE5C",
+        "danger":          "#E87A7A",
+        "blue_soft":       "#5088C8",
+        "dem_blue":        "#1A4F8A",
+        "dem_light":       "#6FA9E8",
+        "rep_red":         "#8A1A1A",
+        "rep_light":       "#E8706E",
+        "ind_purple":      "#5A3A8A",
+        "ind_light":       "#9B72D4",
+        "ctk_mode":        "Dark",
     },
     "Ivory (Light)": {
-        "bg":            "#F4F0E8",
-        "surface":       "#EDEAE0",
-        "surface_2":     "#E2DDD2",
-        "border":        "#C8C2B4",
-        "accent":        "#8B4513",
-        "accent_dim":    "#5C2D0A",
-        "text_primary":  "#1A1612",
-        "text_secondary":"#5A5040",
-        "text_dim":      "#A89A88",
-        "positive":      "#2E7D32",
-        "warning":       "#8B6914",
-        "danger":        "#B71C1C",
-        "blue_soft":     "#1565C0",
-        "dem_blue":      "#1A4F8A",
-        "dem_light":     "#1565C0",
-        "rep_red":       "#8A1A1A",
-        "rep_light":     "#C62828",
-        "ind_purple":    "#5A3A8A",
-        "ind_light":     "#6A1B9A",
-        "ctk_mode":      "Light",
+        "bg":              "#F6F3EC",
+        "surface":         "#EFECE3",
+        "surface_2":       "#DBD4C4",
+        "border":          "#B7AD98",
+        "accent":          "#7A3A10",
+        "accent_dim":      "#5C2D0A",
+        "text_primary":    "#17130F",
+        "text_secondary":  "#443C30",
+        "text_dim":        "#5F5748",
+        "positive":        "#186020",
+        "warning":         "#6E510C",
+        "danger":          "#A81818",
+        "blue_soft":       "#1565C0",
+        "dem_blue":        "#1A4F8A",
+        "dem_light":       "#1565C0",
+        "rep_red":         "#8A1A1A",
+        "rep_light":       "#C62828",
+        "ind_purple":      "#5A3A8A",
+        "ind_light":       "#6A1B9A",
+        "ctk_mode":        "Light",
     },
     "Crimson": {
-        "bg":            "#130808",
-        "surface":       "#1E0D0D",
-        "surface_2":     "#2A1212",
-        "border":        "#3D1A1A",
-        "accent":        "#E05252",
-        "accent_dim":    "#A03030",
-        "text_primary":  "#F0E0E0",
-        "text_secondary":"#9A6A6A",
-        "text_dim":      "#4A2A2A",
-        "positive":      "#52A070",
-        "warning":       "#E0A052",
-        "danger":        "#E05252",
-        "blue_soft":     "#5080C0",
-        "dem_blue":      "#1A4F8A",
-        "dem_light":     "#4A90D9",
-        "rep_red":       "#8A1A1A",
-        "rep_light":     "#D94A4A",
-        "ind_purple":    "#5A3A8A",
-        "ind_light":     "#9B72D4",
-        "ctk_mode":      "Dark",
+        "bg":              "#120707",
+        "surface":         "#1E0D0D",
+        "surface_2":       "#3A1C1C",
+        "border":          "#5E3030",
+        "accent":          "#F0736F",
+        "accent_dim":      "#A83A36",
+        "text_primary":    "#F5E4E4",
+        "text_secondary":  "#D4AAAA",
+        "text_dim":        "#B48686",
+        "positive":        "#5FBF85",
+        "warning":         "#E8AC5E",
+        "danger":          "#F0736F",
+        "blue_soft":       "#5080C0",
+        "dem_blue":        "#1A4F8A",
+        "dem_light":       "#6FA9E8",
+        "rep_red":         "#8A1A1A",
+        "rep_light":       "#E8706E",
+        "ind_purple":      "#5A3A8A",
+        "ind_light":       "#9B72D4",
+        "ctk_mode":        "Dark",
     },
 }
 
@@ -509,7 +509,7 @@ class Sidebar(ctk.CTkFrame):
         brand_frame = ctk.CTkFrame(self, fg_color="transparent")
         brand_frame.pack(fill="x", padx=20, pady=30)
 
-        self._brand_label = ctk.CTkLabel(brand_frame, text="EXECUTIVE", font=("Georgia", 20, "bold"),
+        self._brand_label = ctk.CTkLabel(brand_frame, text="EXECUTIVE", font=("Georgia", 18, "bold"),
                      text_color=PALETTE["accent"])
         self._brand_label.pack(anchor="w")
         tr(self._brand_label, text_color="accent")
@@ -730,7 +730,7 @@ class DashboardPanel(ctk.CTkFrame):
         dot.pack(side="left", padx=(10, 4), pady=6)
         dot.pack_propagate(False)
         ctk.CTkLabel(live, text="LIVE  ",
-                     font=("Courier New", 9, "bold"),
+                     font=("Courier New", 10, "bold"),
                      text_color=PALETTE["positive"]).pack(side="left")
 
         ctk.CTkLabel(self,
@@ -784,7 +784,7 @@ class DashboardPanel(ctk.CTkFrame):
 
         self._search_count = tr(ctk.CTkLabel(
             self._search_results_frame, text="",
-            font=("Courier New", 9, "bold"),
+            font=("Courier New", 10, "bold"),
             text_color=PALETTE["text_dim"], anchor="w"),
             text_color="text_dim")
         self._search_count.pack(fill="x", padx=16, pady=(8, 0))
@@ -821,12 +821,12 @@ class DashboardPanel(ctk.CTkFrame):
         feed_hdr.pack(fill="x", pady=(0, 10))
 
         ctk.CTkLabel(feed_hdr, text="RECENT EVENTS & HISTORY",
-                     font=("Courier New", 9, "bold"),
+                     font=("Courier New", 10, "bold"),
                      text_color=PALETTE["text_dim"], anchor="w").pack(side="left")
 
         ctk.CTkLabel(feed_hdr,
                      text=f"{len(self.EVENTS)} events",
-                     font=("Courier New", 9),
+                     font=("Courier New", 10),
                      text_color=PALETTE["text_dim"]).pack(side="right")
 
         self._feed_scroll = ctk.CTkScrollableFrame(
@@ -844,7 +844,7 @@ class DashboardPanel(ctk.CTkFrame):
         filter_frame.grid(row=0, column=1, sticky="nsew")
 
         ctk.CTkLabel(filter_frame, text="FILTER BY CATEGORY",
-                     font=("Courier New", 9, "bold"),
+                     font=("Courier New", 10, "bold"),
                      text_color=PALETTE["text_dim"], anchor="w").pack(fill="x", pady=(0, 10))
 
         categories = ["ALL", "WAR", "POLITICS", "POLICY", "GOVERNMENT", "LEGAL", "CRISIS"]
@@ -865,7 +865,7 @@ class DashboardPanel(ctk.CTkFrame):
 
         # Ongoing alerts box
         ctk.CTkLabel(filter_frame, text="ACTIVE ALERTS",
-                     font=("Courier New", 9, "bold"),
+                     font=("Courier New", 10, "bold"),
                      text_color=PALETTE["text_dim"], anchor="w").pack(fill="x", pady=(16, 8))
 
         alerts = [
@@ -883,7 +883,7 @@ class DashboardPanel(ctk.CTkFrame):
                          text_color=PALETTE.get(color_key, PALETTE["accent"]),
                          anchor="w").pack(fill="x", padx=12, pady=(8, 2))
             ctk.CTkLabel(alert_card, text=sub,
-                         font=("Courier New", 9),
+                         font=("Courier New", 10),
                          text_color=PALETTE["text_dim"], anchor="w").pack(fill="x", padx=12, pady=(0, 8))
 
     # ── Search corpus ─────────────────────────────────────────────────────────
@@ -973,9 +973,9 @@ class DashboardPanel(ctk.CTkFrame):
                          text_color=PALETTE["text_primary"], anchor="w").pack(side="left")
             tab_b = ctk.CTkFrame(top, fg_color=PALETTE["border"], corner_radius=4)
             tab_b.pack(side="right")
-            ctk.CTkLabel(tab_b, text=item["tab"], font=("Courier New", 8, "bold"),
+            ctk.CTkLabel(tab_b, text=item["tab"], font=("Courier New", 10, "bold"),
                          text_color=color).pack(padx=6, pady=2)
-            ctk.CTkLabel(card, text=item["meta"], font=("Courier New", 9),
+            ctk.CTkLabel(card, text=item["meta"], font=("Courier New", 10),
                          text_color=PALETTE["text_dim"], anchor="w"
                          ).pack(fill="x", padx=14, pady=(0, 2))
             ctk.CTkLabel(card, text=item["detail"], font=("Courier New", 10),
@@ -1005,7 +1005,7 @@ class DashboardPanel(ctk.CTkFrame):
         master.grid_columnconfigure(col, weight=1)
         tr(card, fg_color="surface", border_color="border")
 
-        tr(ctk.CTkLabel(card, text=title, font=("Courier New", 9, "bold"),
+        tr(ctk.CTkLabel(card, text=title, font=("Courier New", 10, "bold"),
                      text_color=PALETTE["text_secondary"]),
            text_color="text_secondary").pack(pady=(16, 4))
         tr(ctk.CTkLabel(card, text=value, font=("Georgia", 18, "bold"),
@@ -1073,14 +1073,14 @@ class DashboardPanel(ctk.CTkFrame):
         meta_row.pack(fill="x", pady=(0, 3))
 
         ctk.CTkLabel(meta_row, text=date,
-                     font=("Courier New", 9, "bold"),
+                     font=("Courier New", 10, "bold"),
                      text_color=PALETTE["text_dim"], anchor="w").pack(side="left")
 
         badge = ctk.CTkFrame(meta_row, fg_color=PALETTE["surface_2"],
                               corner_radius=3)
         badge.pack(side="left", padx=(8, 0))
         ctk.CTkLabel(badge, text=cat,
-                     font=("Courier New", 8, "bold"),
+                     font=("Courier New", 10, "bold"),
                      text_color=cat_color).pack(padx=6, pady=2)
 
         ctk.CTkLabel(content, text=headline,
@@ -1142,7 +1142,7 @@ class LegalQAPanel(ctk.CTkFrame):
         self.input_field = ctk.CTkEntry(
             input_container, placeholder_text="Query the executive record...",
             fg_color="transparent", border_width=0,
-            text_color=PALETTE["text_primary"], font=("Georgia", 14)
+            text_color=PALETTE["text_primary"], font=("Georgia", 15)
         )
         self.input_field.pack(side="left", fill="both", expand=True, padx=20)
         self.input_field.bind("<Return>", lambda e: self.handle_submission())
@@ -1160,8 +1160,12 @@ class LegalQAPanel(ctk.CTkFrame):
             llm = self.engine.llm
             kind = " (reasoning)" if llm.looks_like_reasoner(llm.model) else ""
             state = "ready" if llm.configured else "no API key \u2014 see Settings"
+            live = {"off": "archive only",
+                    "federal_register": "+ live Federal Register",
+                    "federal_register_web": "+ live Federal Register & web"}.get(
+                        self.engine.live_mode, "")
             return (f"{llm.spec['label']} \u00b7 {llm.model}{kind} \u00b7 {state}"
-                    f"  |  searching {len(self.engine.records):,} records")
+                    f"  |  {len(self.engine.records):,} records {live}")
         except Exception:
             return ""
 
@@ -1237,24 +1241,41 @@ class BillsPanel(ctk.CTkFrame):
 
     # Party colour mapping
     PARTY_COLORS = {
-        "Trump 2nd Term":  "#D94A4A",
-        "Trump 1st Term":  "#D94A4A",
-        "Biden":           "#4A90D9",
-        "Obama":           "#4A90D9",
-        "W. Bush":         "#D94A4A",
-        "Clinton":         "#4A90D9",
-        "H.W. Bush":       "#D94A4A",
-        "Reagan":          "#D94A4A",
-        "Carter":          "#4A90D9",
-        "Ford":            "#D94A4A",
-        "Nixon":           "#D94A4A",
-        "Johnson":         "#4A90D9",
-        "Kennedy":         "#4A90D9",
-        "Eisenhower":      "#D94A4A",
-        "Truman":          "#4A90D9",
-        "Roosevelt":       "#4A90D9",
-        "Historical":      "#7A8099",
+        "Trump 2nd Term":  "#E8706E",
+        "Trump 1st Term":  "#E8706E",
+        "Biden":           "#6FA9E8",
+        "Obama":           "#6FA9E8",
+        "W. Bush":         "#E8706E",
+        "Clinton":         "#6FA9E8",
+        "H.W. Bush":       "#E8706E",
+        "Reagan":          "#E8706E",
+        "Carter":          "#6FA9E8",
+        "Ford":            "#E8706E",
+        "Nixon":           "#E8706E",
+        "Johnson":         "#6FA9E8",
+        "Kennedy":         "#6FA9E8",
+        "Eisenhower":      "#E8706E",
+        "Truman":          "#6FA9E8",
+        "Roosevelt":       "#6FA9E8",
+        "Historical":      "#98A0B8",
     }
+
+    # The mid-tone reds and blues above read well on the dark themes but fall
+    # to ~2.3:1 on Ivory, so each has a darker twin used when the theme is light.
+    PARTY_COLORS_LIGHT = {
+        "#E8706E": "#A82121",
+        "#6FA9E8": "#1B5A9E",
+        "#98A0B8": "#4A5066",
+    }
+
+    def _party(self, name, fallback=None):
+        """The party colour for this president, corrected for a light theme."""
+        base = self.PARTY_COLORS.get(name)
+        if base is None:
+            return fallback if fallback is not None else PALETTE["text_secondary"]
+        if str(PALETTE.get("ctk_mode", "dark")).lower() == "light":
+            return self.PARTY_COLORS_LIGHT.get(base, base)
+        return base
 
     def __init__(self, master, engine):
         super().__init__(master, fg_color="transparent")
@@ -1284,9 +1305,10 @@ class BillsPanel(ctk.CTkFrame):
                                           border_color=PALETTE["border"])
         self._count_badge.pack(side="right", pady=6)
         self._count_lbl = ctk.CTkLabel(self._count_badge, text="",
-                                        font=("Courier New", 9, "bold"),
-                                        text_color=PALETTE["text_dim"])
-        self._count_lbl.pack(padx=10, pady=4)
+                                        font=("Courier New", 10, "bold"),
+                                        text_color=PALETTE["text_secondary"])
+        tr(self._count_lbl, text_color="text_secondary")
+        self._count_lbl.pack(padx=12, pady=5)
 
         ctk.CTkLabel(self, text="Browse, search, and filter every presidential executive order on record.",
                      font=("Courier New", 11), text_color=PALETTE["text_secondary"],
@@ -1315,18 +1337,40 @@ class BillsPanel(ctk.CTkFrame):
             tab_canvas.configure(scrollregion=tab_canvas.bbox("all"))
         self._tab_inner.bind("<Configure>", _on_tab_configure)
 
-        self._tab_btns = {}
+        self._tab_btns, self._tab_rules = {}, {}
         for name in self.SOURCES:
-            color = self.PARTY_COLORS.get(name, PALETTE["text_secondary"])
+            color = self._party(name)
+
+            # Each tab is a button stacked over a 2px rule that lights up in
+            # the president's party colour while the tab is active.
+            col = tk.Frame(self._tab_inner, bg=PALETTE["surface"])
+            col.pack(side="left", padx=2, pady=(4, 0))
+
             btn = tk.Button(
-                self._tab_inner, text=name,
+                col, text=name,
                 bg=PALETTE["surface"], fg=PALETTE["text_secondary"],
                 activebackground=PALETTE["surface_2"], activeforeground=color,
-                relief="flat", cursor="hand2", padx=10, pady=8,
-                font=("Courier New", 10),
+                relief="flat", cursor="hand2", padx=12, pady=7,
+                font=("Courier New", 11),
                 command=lambda n=name: self._select_president(n)
             )
-            btn.pack(side="left", padx=2, pady=4)
+            btn.pack(fill="x")
+
+            rule = tk.Frame(col, height=2, bg=PALETTE["surface"])
+            rule.pack(fill="x")
+            self._tab_rules[name] = rule
+
+            def _hover_in(_e, b=btn, n=name):
+                if n != self._current_president:
+                    b.configure(bg=PALETTE["surface_2"],
+                                fg=PALETTE["text_primary"])
+            def _hover_out(_e, b=btn, n=name):
+                if n != self._current_president:
+                    b.configure(bg=PALETTE["surface"],
+                                fg=PALETTE["text_secondary"])
+            btn.bind("<Enter>", _hover_in)
+            btn.bind("<Leave>", _hover_out)
+
             self._tab_btns[name] = btn
 
         # ── Search & filter bar ───────────────────────────────────────────
@@ -1342,6 +1386,15 @@ class BillsPanel(ctk.CTkFrame):
             text_color=PALETTE["text_primary"], font=("Georgia", 13)
         )
         self._search_entry.pack(side="left", fill="x", expand=True, padx=16, pady=10)
+
+        # A focus ring, so it's obvious where typing goes.
+        def _focus_in(_e, b=bar):
+            b.configure(border_color=PALETTE["accent"])
+        def _focus_out(_e, b=bar):
+            b.configure(border_color=PALETTE["border"])
+        self._search_entry.bind("<FocusIn>", _focus_in)
+        self._search_entry.bind("<FocusOut>", _focus_out)
+
         self._bills_debouncer = _Debouncer(250)
         self._search_entry.bind("<Return>", lambda e: self._apply_filter())
         self._search_entry.bind("<KeyRelease>", lambda e: self._bills_debouncer.call(
@@ -1444,6 +1497,7 @@ class BillsPanel(ctk.CTkFrame):
         self._fill_job, self._fill_gen = None, 0
         self._style_tree()
         on_theme(self._style_tree)
+        on_theme(self._restyle_tabs)
 
         # Ctrl+F jumps to the search box from anywhere in the panel.
         self.bind_all("<Control-f>", lambda e: self._focus_search())
@@ -1461,10 +1515,10 @@ class BillsPanel(ctk.CTkFrame):
             text_color=PALETTE["text_primary"],
             wraplength=900, justify="left", anchor="w"
         )
-        self._detail_title.pack(fill="x", padx=20, pady=(16, 4))
+        self._detail_title.pack(fill="x", padx=24, pady=(18, 6))
 
         detail_meta = ctk.CTkFrame(self._detail_panel, fg_color="transparent")
-        detail_meta.pack(fill="x", padx=20, pady=(0, 4))
+        detail_meta.pack(fill="x", padx=24, pady=(0, 6))
         self._detail_meta = ctk.CTkLabel(detail_meta, text="",
                                           font=("Courier New", 10),
                                           text_color=PALETTE["text_secondary"], anchor="w")
@@ -1476,7 +1530,7 @@ class BillsPanel(ctk.CTkFrame):
             text_color=PALETTE["text_dim"],
             wraplength=900, justify="left", anchor="w"
         )
-        self._detail_notes.pack(fill="x", padx=20, pady=(0, 16))
+        self._detail_notes.pack(fill="x", padx=24, pady=(0, 18))
 
         self._detail_open = ctk.CTkButton(
             self._detail_panel, text="Open source", width=110, height=24,
@@ -1567,14 +1621,19 @@ class BillsPanel(ctk.CTkFrame):
         self._hide_detail()
 
         # Update tab highlight
-        active_color = self.PARTY_COLORS.get(name, PALETTE["accent"])
+        active_color = self._party(name, PALETTE["accent"])
         for n, btn in self._tab_btns.items():
+            rule = self._tab_rules.get(n)
             if n == name:
                 btn.configure(bg=PALETTE["surface_2"], fg=active_color,
-                              font=("Courier New", 10, "bold"))
+                              font=("Courier New", 11, "bold"))
+                if rule is not None:
+                    rule.configure(bg=active_color)
             else:
                 btn.configure(bg=PALETTE["surface"], fg=PALETTE["text_secondary"],
-                              font=("Courier New", 10))
+                              font=("Courier New", 11))
+                if rule is not None:
+                    rule.configure(bg=PALETTE["surface"])
 
         # A Federal Register sync or a rescan replaces the CSVs underneath us,
         # so drop the cache whenever the engine has reloaded.
@@ -1601,6 +1660,20 @@ class BillsPanel(ctk.CTkFrame):
         self._status_var.set("Any status")
         self._sort_col, self._sort_desc = None, False
         self._apply_filter()
+
+    def _restyle_tabs(self):
+        """Repaint the president tabs after a theme change."""
+        for name, btn in self._tab_btns.items():
+            active = (name == self._current_president)
+            btn.configure(
+                bg=PALETTE["surface_2"] if active else PALETTE["surface"],
+                fg=self._party(name) if active else PALETTE["text_secondary"],
+                activebackground=PALETTE["surface_2"],
+                activeforeground=self._party(name))
+            rule = self._tab_rules.get(name)
+            if rule is not None:
+                rule.configure(bg=self._party(name) if active
+                               else PALETTE["surface"])
 
     def _focus_search(self):
         try:
@@ -1669,19 +1742,19 @@ class BillsPanel(ctk.CTkFrame):
                      background=PALETTE["surface"],
                      fieldbackground=PALETTE["surface"],
                      foreground=PALETTE["text_primary"],
-                     borderwidth=0, relief="flat", rowheight=27,
-                     font=("Georgia", 11))
+                     borderwidth=0, relief="flat", rowheight=31,
+                     font=("Georgia", 12))
         st.configure("EI.Treeview.Heading",
                      background=PALETTE["surface_2"],
-                     foreground=PALETTE["text_dim"],
-                     relief="flat", borderwidth=0, padding=(8, 7),
-                     font=("Courier New", 9, "bold"))
+                     foreground=PALETTE["text_secondary"],
+                     relief="flat", borderwidth=0, padding=(10, 9),
+                     font=("Courier New", 10, "bold"))
         st.map("EI.Treeview.Heading",
                background=[("active", PALETTE["border"])],
                foreground=[("active", PALETTE["accent"])])
         st.map("EI.Treeview",
-               background=[("selected", PALETTE["surface_2"])],
-               foreground=[("selected", PALETTE["accent"])])
+               background=[("selected", PALETTE["border"])],
+               foreground=[("selected", PALETTE["text_primary"])])
         st.layout("EI.Treeview", [("EI.Treeview.treearea", {"sticky": "nswe"})])
         st.configure("EI.Vertical.TScrollbar",
                      background=PALETTE["border"], troughcolor=PALETTE["surface"],
@@ -1854,7 +1927,7 @@ class PartyCard(ctk.CTkFrame):
 
         ctk.CTkLabel(
             top_row, text=self.party_name,
-            font=("Georgia", 17, "bold"),
+            font=("Georgia", 18, "bold"),
             text_color=self.data["color"], anchor="w"
         ).pack(side="left")
 
@@ -1922,7 +1995,7 @@ class PartyCard(ctk.CTkFrame):
 
         ctk.CTkLabel(
             frame, text=heading,
-            font=("Courier New", 9, "bold"),
+            font=("Courier New", 10, "bold"),
             text_color=self.data["color"]
         ).pack(anchor="w", padx=16, pady=(14, 8))
 
@@ -1985,7 +2058,7 @@ class PartyImpactPanel(ctk.CTkFrame):
         badge.pack(side="right", pady=6)
         ctk.CTkLabel(
             badge, text="NON-PARTISAN  •  INFORMATIONAL",
-            font=("Courier New", 9, "bold"),
+            font=("Courier New", 10, "bold"),
             text_color=PALETTE["text_dim"]
         ).pack(padx=10, pady=4)
 
@@ -2031,7 +2104,7 @@ class WarCard(ctk.CTkFrame):
     """Expandable card for a single US war."""
 
     STATUS_COLORS = {
-        "ongoing":    "#D94A4A",   # red — active conflict
+        "ongoing":    "#E8706E",   # red — active conflict
         "historical": "#3D4357",   # dim grey
     }
 
@@ -2079,7 +2152,7 @@ class WarCard(ctk.CTkFrame):
         badge.pack(side="left", padx=(12, 0))
         ctk.CTkLabel(
             badge, text=status_text,
-            font=("Courier New", 9, "bold"),
+            font=("Courier New", 10, "bold"),
             text_color=self._status_color
         ).pack(padx=8, pady=3)
 
@@ -2145,7 +2218,7 @@ class WarCard(ctk.CTkFrame):
 
         ctk.CTkLabel(
             impacts_frame, text="KEY IMPACTS",
-            font=("Courier New", 9, "bold"),
+            font=("Courier New", 10, "bold"),
             text_color=self._status_color
         ).pack(anchor="w", padx=16, pady=(14, 8))
 
@@ -2209,8 +2282,8 @@ class USWarsPanel(ctk.CTkFrame):
         badge.pack(side="right", pady=6)
         ctk.CTkLabel(
             badge, text=f"  {ongoing} ACTIVE CONFLICT{'S' if ongoing != 1 else ''}  ",
-            font=("Courier New", 9, "bold"),
-            text_color="#D94A4A"
+            font=("Courier New", 10, "bold"),
+            text_color="#E8706E"
         ).pack(pady=4)
 
         ctk.CTkLabel(
@@ -2243,7 +2316,7 @@ class USWarsPanel(ctk.CTkFrame):
 
         ctk.CTkLabel(
             filter_row, text="FILTER:",
-            font=("Courier New", 9, "bold"),
+            font=("Courier New", 10, "bold"),
             text_color=PALETTE["text_dim"]
         ).pack(side="left", padx=(0, 10))
 
@@ -2329,7 +2402,7 @@ GOV_ERAS = [
     {
         "era":     "Democratic-Republican Dominance",
         "years":   "1801 – 1825",
-        "color":   "#4A90D9",
+        "color":   "#6FA9E8",
         "summary": (
             "The Federalist Party collapsed and the Democratic-Republicans dominated "
             "unchallenged. This 'Era of Good Feelings' saw westward expansion, the "
@@ -2372,7 +2445,7 @@ GOV_ERAS = [
     {
         "era":     "Jacksonian Democracy & Expansion",
         "years":   "1825 – 1849",
-        "color":   "#D94A4A",
+        "color":   "#E8706E",
         "summary": (
             "A new populist politics emerged under Andrew Jackson, expanding voting rights "
             "to white men without property. This era saw the forced removal of Native "
@@ -2701,7 +2774,7 @@ GOV_ERAS = [
     {
         "era":     "Civil Rights, Vietnam & the Cultural Revolution",
         "years":   "1961 – 1981",
-        "color":   "#4A90D9",
+        "color":   "#6FA9E8",
         "summary": (
             "America was torn apart and remade. JFK's assassination, the Civil Rights "
             "movement, Vietnam, Nixon's Watergate, and the energy crisis defined a "
@@ -2762,7 +2835,7 @@ GOV_ERAS = [
     {
         "era":     "Reagan Revolution to the 21st Century",
         "years":   "1981 – 2001",
-        "color":   "#D94A4A",
+        "color":   "#E8706E",
         "summary": (
             "Ronald Reagan reshaped American conservatism and accelerated the end of the "
             "Cold War. The Soviet Union dissolved in 1991. The 1990s brought economic "
@@ -3121,7 +3194,7 @@ class GovHistoryPanel(ctk.CTkFrame):
         total_presidents = sum(len(e["presidents"]) for e in GOV_ERAS)
         ctk.CTkLabel(
             badge, text=f"  {total_presidents} PRESIDENTS  •  {len(GOV_ERAS)} ERAS  ",
-            font=("Courier New", 9, "bold"),
+            font=("Courier New", 10, "bold"),
             text_color=PALETTE["text_dim"]
         ).pack(pady=4)
 
@@ -3138,7 +3211,7 @@ class GovHistoryPanel(ctk.CTkFrame):
 
         ctk.CTkLabel(
             ctrl_row, text="QUICK ACTIONS:",
-            font=("Courier New", 9, "bold"),
+            font=("Courier New", 10, "bold"),
             text_color=PALETTE["text_dim"]
         ).pack(side="left", padx=(0, 10))
 
@@ -3798,6 +3871,11 @@ class SettingsPanel(ctk.CTkFrame):
     # Appearance, AI provider + API key, data sources, indexing, enrichment.
 
     PROVIDER_LABELS = {"OpenRouter": "openrouter", "OpenAI": "openai"}
+    LIVE_LABELS = {
+        "Off \u2014 local archive only":        "off",
+        "Federal Register (recommended)":    "federal_register",
+        "Federal Register + web search":     "federal_register_web",
+    }
     LIMIT_CHOICES = ["50 records", "200 records", "500 records", "Everything"]
 
     def __init__(self, master, on_theme_change, engine=None, **kwargs):
@@ -3838,7 +3916,7 @@ class SettingsPanel(ctk.CTkFrame):
         tr(f, fg_color="border")
 
     def _section(self, parent, label, first=False):
-        tr(ctk.CTkLabel(parent, text=label, font=("Courier New", 9, "bold"),
+        tr(ctk.CTkLabel(parent, text=label, font=("Courier New", 10, "bold"),
                         text_color=PALETTE["text_dim"], anchor="w"),
            text_color="text_dim").pack(fill="x", padx=30, pady=(24, 10))
 
@@ -3925,7 +4003,7 @@ class SettingsPanel(ctk.CTkFrame):
             dot.place(relx=0.5, rely=0.5, anchor="center")
 
             ctk.CTkLabel(col, text=name,
-                         font=("Courier New", 9, "bold" if is_active else "normal"),
+                         font=("Courier New", 10, "bold" if is_active else "normal"),
                          text_color=theme["accent"] if is_active else PALETTE["text_dim"]
                          ).pack(pady=(6, 0))
 
@@ -4011,6 +4089,30 @@ class SettingsPanel(ctk.CTkFrame):
                                       command=self._on_model_pick, width=270)
         self._model_menu.pack(side="left")
 
+        # live data row
+        live_row = ctk.CTkFrame(container, fg_color="transparent")
+        live_row.pack(fill="x", padx=30, pady=(0, 10))
+
+        tr(ctk.CTkLabel(live_row, text="Live data", width=90, anchor="w",
+                        font=("Courier New", 11), text_color=PALETTE["text_secondary"]),
+           text_color="text_secondary").pack(side="left")
+
+        self._live_menu = self._menu(live_row, list(self.LIVE_LABELS),
+                                     command=self._on_live_change, width=300)
+        current_mode = str(self._settings.get("live_data", "federal_register"))
+        self._live_menu.set(next((k for k, v in self.LIVE_LABELS.items()
+                                  if v == current_mode),
+                                 "Federal Register (recommended)"))
+        self._live_menu.pack(side="left")
+
+        self._hint(container,
+                   "With live data on, every question also queries "
+                   "federalregister.gov: documents published since your CSVs "
+                   "were built, and the actual text of an order rather than "
+                   "just its title. Adding web search sends a general search "
+                   "alongside the model and lists its sources; that option "
+                   "needs OpenRouter and costs a little extra per question.")
+
         # actions
         act = ctk.CTkFrame(container, fg_color="transparent")
         act.pack(fill="x", padx=30, pady=(4, 6))
@@ -4057,6 +4159,15 @@ class SettingsPanel(ctk.CTkFrame):
         provider = self.PROVIDER_LABELS.get(label, "openrouter")
         self._persist({"ai_provider": provider})
         self._sync_provider_fields(provider)
+
+    def _on_live_change(self, label):
+        mode = self.LIVE_LABELS.get(label, "federal_register")
+        self._persist({"live_data": mode})
+        if mode == "federal_register_web" and self._provider_menu.get() != "OpenRouter":
+            self._ai_status.configure(
+                text="Web search needs OpenRouter; the Federal Register lookup "
+                     "still works on OpenAI.",
+                text_color=PALETTE["warning"])
 
     def _on_model_pick(self, value):
         self._model_entry.delete(0, "end")
@@ -4450,7 +4561,7 @@ class SettingsPanel(ctk.CTkFrame):
                         text_color=PALETTE["text_primary"], anchor="w"),
            text_color="text_primary").pack(anchor="w")
         tr(ctk.CTkLabel(name_col, text="CREATOR & DEVELOPER",
-                        font=("Courier New", 9, "bold"),
+                        font=("Courier New", 10, "bold"),
                         text_color=PALETTE["accent"], anchor="w"),
            text_color="accent").pack(anchor="w", pady=(2, 0))
 
