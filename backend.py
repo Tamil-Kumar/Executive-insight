@@ -615,11 +615,44 @@ class LLMClient:
     # back in a separate field, and the whole budget can be spent thinking so
     # that "content" arrives empty. All three are handled here.
 
-    THINK_TAGS = re.compile(
-        r"<(think|thinking|reasoning|thought|scratchpad)>.*?</\1>",
-        re.DOTALL | re.IGNORECASE)
-    UNCLOSED_THINK = re.compile(
-        r"^\s*<(think|thinking|reasoning|thought|scratchpad)>.*", re.DOTALL | re.IGNORECASE)
+    # Chain-of-thought escapes in more shapes than one. This covers all of
+    # them: XML-ish tags, pipe-delimited tags, fenced blocks, a stray closing
+    # tag with no opener, explicit "final answer" markers, and models that just
+    # narrate their deliberation in plain prose with no markup at all.
+
+    _TAG_NAMES = (r"think|thinking|thoughts?|reason(?:ing)?|scratch(?:pad)?|"
+                  r"analysis|reflection|deliberation|inner_monologue|plan|"
+                  r"antthinking")
+
+    THINK_TAGS = re.compile(rf"<({_TAG_NAMES})\s*>.*?</\1\s*>",
+                            re.DOTALL | re.IGNORECASE)
+    PIPE_TAGS = re.compile(rf"<\|?({_TAG_NAMES})\|?>.*?<\|?/\1\|?>",
+                           re.DOTALL | re.IGNORECASE)
+    BRACKET_TAGS = re.compile(rf"\[({_TAG_NAMES})\].*?\[/\1\]",
+                              re.DOTALL | re.IGNORECASE)
+    FENCED = re.compile(rf"```(?:{_TAG_NAMES})\b.*?```", re.DOTALL | re.IGNORECASE)
+    ANY_OPEN = re.compile(rf"<\|?({_TAG_NAMES})\|?\s*>", re.IGNORECASE)
+    ANY_CLOSE = re.compile(rf"<\|?/({_TAG_NAMES})\|?\s*>", re.IGNORECASE)
+
+    # A heading the model puts in front of its real answer. Handles "Answer:",
+    # "**Answer:**", "## Final Answer -" and friends, on their own line or
+    # inline before the text.
+    FINAL_MARKER = re.compile(
+        r"^[ \t]*(?:#{1,4}[ \t]*)?(?:\*\*|__)?[ \t]*"
+        r"(?:final answer|final response|answer|response|conclusion)"
+        r"[ \t]*[:\-\u2014]?[ \t]*(?:\*\*|__)?[ \t]*[:\-\u2014]?[ \t]*",
+        re.IGNORECASE | re.MULTILINE)
+
+    # Openers that mean the model started narrating instead of answering.
+    DELIBERATION = re.compile(
+        r"^\s*(?:(?:okay|ok|alright|right|so|hmm|well|now|sure|got it)"
+        r"[,.\u2014-]?\s*){0,3}"
+        r"(?:let me|let's|i need to|i should|i'll|i will|i must|first,? i|"
+        r"the user (?:is )?(?:asking|wants|needs|said)|looking at (?:the|these)|"
+        r"we need to|to answer this|my task|the question asks|i see that|"
+        r"i'm going to|going through|based on my|breaking this down|"
+        r"i have to|checking the|scanning the)",
+        re.IGNORECASE)
 
     @staticmethod
     def looks_like_reasoner(model: str) -> bool:
@@ -631,19 +664,79 @@ class LLMClient:
 
     @classmethod
     def strip_thinking(cls, text: str) -> str:
-        """Remove chain-of-thought so only the answer reaches the user."""
+        """Return only the answer. Everything deliberative is removed."""
         if not text:
             return ""
-        out = cls.THINK_TAGS.sub("", text)
-        # A budget cut mid-thought leaves an opening tag with no close.
-        if cls.UNCLOSED_THINK.match(out):
-            for marker in ("</think>", "</thinking>", "</reasoning>"):
-                if marker in out:
-                    out = out.split(marker, 1)[1]
-                    break
-            else:
-                out = ""
+        out = text
+
+        # 1. Paired blocks in every markup style the models use.
+        for pattern in (cls.THINK_TAGS, cls.PIPE_TAGS, cls.BRACKET_TAGS, cls.FENCED):
+            out = pattern.sub("", out)
+
+        # 2. A closing tag with no opener — the opener was consumed upstream, so
+        #    everything before the close is thought. Take the last one.
+        closes = list(cls.ANY_CLOSE.finditer(out))
+        if closes:
+            out = out[closes[-1].end():]
+
+        # 3. An opener with no close: the budget ran out mid-thought, and
+        #    nothing after it is usable.
+        opener = cls.ANY_OPEN.search(out)
+        if opener:
+            out = out[:opener.start()]
+
+        out = out.strip()
+
+        # 4. An explicit "Final answer:" heading — keep what follows it, but
+        #    only when what precedes it actually reads like deliberation, so a
+        #    legitimate section heading isn't treated as a cut point.
+        markers = [m for m in cls.FINAL_MARKER.finditer(out)
+                   # Needs punctuation ("Answer:") or to stand alone on its own
+                   # line ("## Final Answer"), so a paragraph that merely begins
+                   # with the word "Answer" isn't mistaken for a heading.
+                   if any(ch in m.group(0) for ch in ":-\u2014")
+                   or m.end() >= len(out) or out[m.end()] == "\n"]
+        if markers:
+            last = markers[-1]
+            before, after = out[:last.start()], out[last.end():].strip()
+            if after and cls._is_deliberative(before):
+                out = after
+
+        # 5. Untagged narration: drop leading paragraphs that open with a
+        #    deliberation cue, provided a real answer remains behind them.
+        out = cls._drop_narration(out)
         return out.strip()
+
+    @classmethod
+    def _is_deliberative(cls, text: str) -> bool:
+        if not text.strip():
+            return False
+        if cls.DELIBERATION.search(text):
+            return True
+        cues = ("step 1", "let me", "let's", "i'll check", "first,", "wait,",
+                "actually,", "hmm", "thinking through", "my reasoning")
+        low = text.lower()
+        return sum(cue in low for cue in cues) >= 2
+
+    @classmethod
+    def _drop_narration(cls, text: str) -> str:
+        paragraphs = re.split(r"\n\s*\n", text)
+        if len(paragraphs) < 2:
+            return text
+        keep = 0
+        for para in paragraphs:
+            if cls.DELIBERATION.match(para.strip()):
+                keep += 1
+            else:
+                break
+        if not keep:
+            return text
+        remainder = "\n\n".join(paragraphs[keep:]).strip()
+        # The loop stops at the first paragraph that isn't deliberative, so a
+        # non-empty remainder is by definition the answer — however short. An
+        # empty one means the whole reply was narration, and showing that beats
+        # showing a blank bubble.
+        return remainder if remainder else text
 
     @staticmethod
     def _extract(choice: dict):
@@ -682,8 +775,10 @@ class LLMClient:
             payload["temperature"] = temperature
 
         if self.provider == "openrouter" and reasoner:
-            # Keep the thinking short; we only want the conclusion.
-            payload["reasoning"] = {"effort": "low"}
+            # Think briefly, and don't send the thinking back: "exclude" keeps
+            # reasoning tokens out of the response entirely, so there is
+            # nothing to leak into the chat window.
+            payload["reasoning"] = {"effort": "low", "exclude": True}
         return payload
 
     # -- generation ----------------------------------------------------------
@@ -923,6 +1018,13 @@ metadata whenever both are available, and attribute anything that came from \
 the wider web to its source.
 
 HOW TO ANSWER
+Give the finished answer only. Do not narrate your process, do not think out \
+loud on the page, and do not show your working. Nothing that reads like "Let me \
+check the records", "First I'll look at", "The user is asking", "Okay, so" or \
+"Final answer:" belongs in the reply — start directly with the substance. Do \
+not restate the question before answering it, and do not add a closing summary \
+that repeats what you just said.
+
 Lead with the direct answer in a sentence or two, then the supporting records. \
 Reference documents as: EO 13805 (signed 2017-07-19). When only a publication \
 date exists, use it and label it as published. When listing several records, \
@@ -1588,7 +1690,9 @@ class LegalEngine:
                       '"topics": ["up to 4 short tags"], '
                       '"impact": "High|Medium|Low", '
                       '"agencies": ["agencies named or affected"]}. '
-                      "Use only the title and notes given. Empty list if unknown.")
+                      "Use only the title and notes given. Empty list if "
+                      "unknown. Output the JSON array and nothing else \u2014 no "
+                      "reasoning, no commentary, no preamble.")
             try:
                 parsed = _parse_json_array(
                     self.llm.complete(system, listing, max_tokens=1200, temperature=0))
