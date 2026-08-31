@@ -1500,7 +1500,14 @@ class BillsPanel(ctk.CTkFrame):
         on_theme(self._restyle_tabs)
 
         # Ctrl+F jumps to the search box from anywhere in the panel.
-        self.bind_all("<Control-f>", lambda e: self._focus_search())
+        # CustomTkinter widgets refuse bind_all, so this goes on the toplevel:
+        # Tk propagates the event up the bindtags chain, so it still fires while
+        # focus is on a child widget.
+        try:
+            self.winfo_toplevel().bind("<Control-f>",
+                                       lambda e: self._focus_search(), add="+")
+        except Exception:
+            pass
 
         # ── Detail panel (hidden until a row is clicked) ──────────────────
         self._detail_panel = ctk.CTkFrame(
