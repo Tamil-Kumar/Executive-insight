@@ -4030,7 +4030,9 @@ class SettingsPanel(ctk.CTkFrame):
                    "to ei_settings.json beside the app, then used for Legal Q&A, "
                    "indexing and record enrichment. No .env file needed. "
                    "Environment variables OPENROUTER_API_KEY / OPENAI_API_KEY "
-                   "still work as a fallback.")
+                   "still work as a fallback. For free inference, "
+                   "'openrouter/free' routes each request to one of the free "
+                   "models; 'Free only' lists the individual ones.")
 
         row = ctk.CTkFrame(container, fg_color="transparent")
         row.pack(fill="x", padx=30, pady=(0, 10))
@@ -4093,8 +4095,21 @@ class SettingsPanel(ctk.CTkFrame):
         self._model_entry.pack(side="left", padx=(0, 12))
 
         self._model_menu = self._menu(model_row, OPENROUTER_MODELS,
-                                      command=self._on_model_pick, width=270)
-        self._model_menu.pack(side="left")
+                                      command=self._on_model_pick, width=250)
+        self._model_menu.pack(side="left", padx=(0, 12))
+
+        self._free_only = ctk.CTkCheckBox(
+            model_row, text="Free only", command=self._reload_models,
+            width=110, checkbox_width=16, checkbox_height=16,
+            fg_color=PALETTE["accent"], hover_color=PALETTE["accent_dim"],
+            text_color=PALETTE["text_secondary"], font=("Courier New", 11))
+        tr(self._free_only, fg_color="accent", text_color="text_secondary")
+        self._free_only.pack(side="left")
+
+        # Typing a model and walking away used to lose it - only Save & test
+        # persisted. Now it sticks on Enter or on leaving the field.
+        self._model_entry.bind("<Return>", lambda e: self._persist_model())
+        self._model_entry.bind("<FocusOut>", lambda e: self._persist_model())
 
         # live data row
         live_row = ctk.CTkFrame(container, fg_color="transparent")
@@ -4179,6 +4194,52 @@ class SettingsPanel(ctk.CTkFrame):
     def _on_model_pick(self, value):
         self._model_entry.delete(0, "end")
         self._model_entry.insert(0, value)
+        self._persist_model()
+
+    def _current_provider(self):
+        return self.PROVIDER_LABELS.get(self._provider_menu.get(), "openrouter")
+
+    def _persist_model(self):
+        """Save whatever is in the model box, so it survives leaving the field."""
+        model = self._model_entry.get().strip()
+        if not model:
+            return
+        spec = PROVIDERS[self._current_provider()]
+        if str(self._settings.get(spec["model_field"], "")) != model:
+            self._persist({spec["model_field"]: model})
+
+    def _reload_models(self):
+        """Repopulate the dropdown, optionally with only the free models."""
+        if self.engine is None:
+            return
+        free = bool(self._free_only.get())
+        self._ai_status.configure(
+            text="Fetching the model list from OpenRouter...",
+            text_color=PALETTE["text_secondary"])
+        threading.Thread(target=self._run_reload_models, args=(free,),
+                         daemon=True).start()
+
+    def _run_reload_models(self, free):
+        try:
+            models = self.engine.llm.get_models(free_only=free)
+        except Exception as e:
+            self._ui(lambda: self._ai_status.configure(
+                text="Could not fetch the model list: " + str(e),
+                text_color=PALETTE["danger"]))
+            return
+        self._ui(self._models_loaded, models, free)
+
+    def _models_loaded(self, models, free):
+        if not models:
+            self._ai_status.configure(
+                text="No free models came back from OpenRouter just now.",
+                text_color=PALETTE["warning"])
+            return
+        self._model_menu.configure(values=models[:60])
+        self._ai_status.configure(
+            text=(f"{len(models)} {'free ' if free else ''}models available. "
+                  f"Pick one from the list, or type an id and press Enter."),
+            text_color=PALETTE["text_dim"])
 
     def _toggle_key_visibility(self):
         self._key_entry.configure(show="" if self._show_key.get() else "\u2022")
@@ -4191,10 +4252,27 @@ class SettingsPanel(ctk.CTkFrame):
         self._ai_status.configure(text="Key cleared.", text_color=PALETTE["text_dim"])
 
     def _save_and_test(self):
-        provider = self.PROVIDER_LABELS.get(self._provider_menu.get(), "openrouter")
+        provider = self._current_provider()
         spec = PROVIDERS[provider]
         key = self._key_entry.get().strip()
         model = self._model_entry.get().strip() or self._model_menu.get()
+
+        # Look the id up for advice only. The live API decides whether a model
+        # works; a local check must never stand between you and a valid one.
+        self._model_hint = ""
+        if self.engine is not None:
+            self.engine.apply_settings({"ai_provider": provider,
+                                        spec["key_field"]: key})
+            ok, why, suggestions = self.engine.llm.validate_model(model)
+            if why:
+                self._model_hint = why
+                self._ai_status.configure(
+                    text=why,
+                    text_color=PALETTE["text_dim"] if ok else PALETTE["warning"])
+            if not ok and suggestions:
+                self._model_hint = (why + "\n\nTry: "
+                                    + ", ".join(suggestions[:5]))
+                self._model_menu.configure(values=list(suggestions)[:60])
 
         if key and not key.startswith(spec["key_prefix"]):
             self._ai_status.configure(
@@ -4223,6 +4301,8 @@ class SettingsPanel(ctk.CTkFrame):
 
     def _test_done(self, ok, msg):
         self._save_btn.configure(state="normal", text="Save & test")
+        if not ok and getattr(self, "_model_hint", ""):
+            msg = msg + "\n\n" + self._model_hint
         self._ai_status.configure(
             text=msg,
             text_color=PALETTE["positive"] if ok else PALETTE["danger"])

@@ -90,6 +90,8 @@ PROVIDERS = {
 
 # Shortlist for the dropdown; any model id can still be typed in.
 OPENROUTER_MODELS = [
+    "openrouter/free",                   # router, free
+    "openrouter/auto",                   # router
     "openai/gpt-4o-mini",
     "openai/gpt-4o",
     "anthropic/claude-3.5-haiku",
@@ -101,6 +103,25 @@ OPENROUTER_MODELS = [
     "deepseek/deepseek-r1",              # reasoning
     "openai/o4-mini",                    # reasoning
     "qwen/qwq-32b",                      # reasoning
+]
+
+# Routers are real model ids that pick a concrete model per request.
+# openrouter/free draws at random from every free-variant model, filtering for
+# whatever the request needs (tool calling, image input, structured output).
+OPENROUTER_ROUTERS = {
+    "openrouter/free": "Free Models Router - picks a free model per request",
+    "openrouter/auto": "Auto Router - picks a model to suit the prompt",
+}
+
+# Individual free variants, marked by the ":free" suffix.
+OPENROUTER_FREE_MODELS = [
+    "openrouter/free",
+    "deepseek/deepseek-r1:free",
+    "deepseek/deepseek-chat-v3-0324:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "google/gemma-3-27b-it:free",
+    "qwen/qwen-2.5-72b-instruct:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
 ]
 
 OPENAI_MODELS = [
@@ -595,19 +616,117 @@ class LLMClient:
         except urllib.error.URLError as e:
             raise LLMError(f"Network error — {e.reason}") from None
 
-    def get_models(self, timeout: int = 20) -> list:
-        """Live model list (OpenRouter). Falls back to the shortlist."""
+    # Ids people type that aren't models. "openrouter/free" is NOT in here:
+    # it is a real router. Anything genuinely unknown is warned about, never
+    # blocked, because this list will always lag OpenRouter's catalogue.
+    MODEL_ALIASES = ("free", "openrouter free", "free models", "any/free",
+                     "free/free", "openrouter/free-models")
+
+    def catalogue(self, timeout: int = 20, force: bool = False) -> list:
+        """
+        Every model id OpenRouter currently offers, with pricing. The endpoint
+        needs no key, so this works before one is set. Cached for the session.
+        """
         if self.provider != "openrouter":
-            return list(OPENAI_MODELS)
+            return [{"id": m, "free": False} for m in OPENAI_MODELS]
+        cached = getattr(self, "_catalogue", None)
+        if cached and not force:
+            return cached
         try:
-            req = urllib.request.Request(self.base_url + "/models",
-                                         headers=self._headers())
+            req = urllib.request.Request(
+                self.base_url + "/models",
+                headers={"User-Agent": "Executive Insight (research tool)"})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-            ids = sorted({m.get("id", "") for m in data.get("data", []) if m.get("id")})
-            return ids or list(OPENROUTER_MODELS)
+            out = []
+            for m in data.get("data", []):
+                mid = m.get("id")
+                if not mid:
+                    continue
+                price = m.get("pricing") or {}
+                free = (str(price.get("prompt", "1")) in ("0", "0.0")
+                        and str(price.get("completion", "1")) in ("0", "0.0"))
+                out.append({"id": mid, "free": free or mid.endswith(":free")})
+            if out:
+                self._catalogue = sorted(out, key=lambda m: m["id"])
+                return self._catalogue
         except Exception:
-            return list(OPENROUTER_MODELS)
+            pass
+        return [{"id": m, "free": m.endswith(":free")}
+                for m in OPENROUTER_MODELS + OPENROUTER_FREE_MODELS]
+
+    def get_models(self, timeout: int = 20, free_only: bool = False) -> list:
+        """Model ids for the picker, optionally only the free ones."""
+        if self.provider != "openrouter":
+            return list(OPENAI_MODELS)
+        cat = self.catalogue(timeout=timeout)
+        ids = [m["id"] for m in cat if m["free"]] if free_only \
+            else [m["id"] for m in cat]
+        if not ids:
+            ids = list(OPENROUTER_FREE_MODELS if free_only else OPENROUTER_MODELS)
+        # Routers dispatch to concrete models, so the catalogue may not list
+        # them; surface them first regardless.
+        routers = [r for r in OPENROUTER_ROUTERS
+                   if (not free_only or r == "openrouter/free")]
+        return routers + [i for i in ids if i not in routers]
+
+    def validate_model(self, name: str):
+        """
+        Check a typed model id before it gets saved.
+
+        Returns (ok, message, suggestions). ok=True with a message means it
+        could not be checked (offline), not that it is known good.
+        """
+        name = (name or "").strip()
+        if not name:
+            return False, "No model set.", []
+
+        if self.provider == "openrouter" and name in OPENROUTER_ROUTERS:
+            return True, OPENROUTER_ROUTERS[name] + ".", []
+
+        if name.lower() in self.MODEL_ALIASES:
+            return (False,
+                    f"'{name}' is not a model id. For free inference use the "
+                    f"router 'openrouter/free', or a specific model's free "
+                    f"variant such as 'deepseek/deepseek-r1:free'. Tick "
+                    f"'Free only' to list what is available right now.",
+                    ["openrouter/free"] + self.get_models(free_only=True)[:5])
+
+        if self.provider != "openrouter":
+            return (name in OPENAI_MODELS, "", OPENAI_MODELS[:6])
+
+        cat = self.catalogue()
+        ids = [m["id"] for m in cat]
+        if not ids:
+            return True, "Could not reach OpenRouter to verify the model id.", []
+        if name in ids:
+            # Valid, but point out when the same model is also offered free.
+            if not name.endswith(":free") and name + ":free" in ids:
+                return (True, f"Note: '{name}:free' is the same model at no "
+                              f"cost, with tighter rate limits.",
+                        [name + ":free"])
+            return True, "", []
+
+        # The usual near-miss: the right model, without the :free suffix.
+        if name + ":free" in ids:
+            return (False,
+                    f"'{name}' exists but is the paid variant. The free one is "
+                    f"'{name}:free'.", [name + ":free"])
+        if name.endswith(":free") and name[:-5] in ids:
+            return (False,
+                    f"'{name}' has no free variant right now. The paid one is "
+                    f"'{name[:-5]}'.", [name[:-5]])
+
+        import difflib
+        close = difflib.get_close_matches(name, ids, n=5, cutoff=0.5)
+        if not close:
+            head = name.split("/")[0].lower()
+            close = [i for i in ids if i.lower().startswith(head)][:5]
+        # A warning, not a refusal: the catalogue may be stale or incomplete,
+        # and being wrong here must never stop a working model from being used.
+        return (True,
+                f"'{name}' wasn't in the catalogue just fetched. Trying it "
+                f"anyway \u2014 if it works, it works.", close)
 
     # -- reasoning / thinking models -----------------------------------------
     # Models that think before answering behave differently in three ways:
@@ -774,11 +893,15 @@ class LLMClient:
             payload["max_tokens"] = payload_tokens
             payload["temperature"] = temperature
 
-        if self.provider == "openrouter" and reasoner:
-            # Think briefly, and don't send the thinking back: "exclude" keeps
-            # reasoning tokens out of the response entirely, so there is
-            # nothing to leak into the chat window.
-            payload["reasoning"] = {"effort": "low", "exclude": True}
+        if self.provider == "openrouter":
+            # Always exclude reasoning tokens, not just for models detected as
+            # reasoners: a router like openrouter/free can hand the request to
+            # a reasoning model without the id ever saying so. Effort is only
+            # capped when we know it thinks. Both are ignored by models that
+            # don't reason.
+            payload["reasoning"] = {"exclude": True}
+            if reasoner:
+                payload["reasoning"]["effort"] = "low"
         return payload
 
     # -- generation ----------------------------------------------------------
