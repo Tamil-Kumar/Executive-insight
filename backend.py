@@ -62,6 +62,7 @@ DEFAULT_SETTINGS = {
     "openrouter_model":  "openai/gpt-4o-mini",
 
     "ai_model":          "gpt-3.5-turbo-instruct",   # legacy key, kept for compat
+    "live_data":         "federal_register",   # off | federal_register | federal_register_web
     "openrouter_site":   "https://executive-insight.local",
     "openrouter_title":  "Executive Insight",
 }
@@ -89,6 +90,8 @@ PROVIDERS = {
 
 # Shortlist for the dropdown; any model id can still be typed in.
 OPENROUTER_MODELS = [
+    "openrouter/free",                   # router, free
+    "openrouter/auto",                   # router
     "openai/gpt-4o-mini",
     "openai/gpt-4o",
     "anthropic/claude-3.5-haiku",
@@ -100,6 +103,25 @@ OPENROUTER_MODELS = [
     "deepseek/deepseek-r1",              # reasoning
     "openai/o4-mini",                    # reasoning
     "qwen/qwq-32b",                      # reasoning
+]
+
+# Routers are real model ids that pick a concrete model per request.
+# openrouter/free draws at random from every free-variant model, filtering for
+# whatever the request needs (tool calling, image input, structured output).
+OPENROUTER_ROUTERS = {
+    "openrouter/free": "Free Models Router - picks a free model per request",
+    "openrouter/auto": "Auto Router - picks a model to suit the prompt",
+}
+
+# Individual free variants, marked by the ":free" suffix.
+OPENROUTER_FREE_MODELS = [
+    "openrouter/free",
+    "deepseek/deepseek-r1:free",
+    "deepseek/deepseek-chat-v3-0324:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "google/gemma-3-27b-it:free",
+    "qwen/qwen-2.5-72b-instruct:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
 ]
 
 OPENAI_MODELS = [
@@ -333,6 +355,117 @@ FR_PRESIDENTS = {
 }
 
 
+FR_DOC_API = "https://www.federalregister.gov/api/v1/documents/{}.json"
+WEB_CACHE_PATH = os.path.join(APP_DIR, "ei_webcache.json")
+
+# Fetched text is cached on disk. Documents never change once published, so the
+# only thing worth expiring is a search result list.
+_WEB_CACHE = None
+SEARCH_TTL = 60 * 60 * 6          # 6 hours
+TEXT_TTL = 60 * 60 * 24 * 90      # 90 days
+
+
+def _web_cache() -> dict:
+    global _WEB_CACHE
+    if _WEB_CACHE is None:
+        _WEB_CACHE = load_json(WEB_CACHE_PATH, {})
+    return _WEB_CACHE
+
+
+def _cache_get(key: str, ttl: int):
+    entry = _web_cache().get(key)
+    if not entry:
+        return None
+    if time.time() - entry.get("t", 0) > ttl:
+        return None
+    return entry.get("v")
+
+
+def _cache_put(key: str, value):
+    _web_cache()[key] = {"t": time.time(), "v": value}
+    write_json(WEB_CACHE_PATH, _WEB_CACHE)
+
+
+_TAG_RE = re.compile(r"<[^>]+>")
+_WS_RE = re.compile(r"[ \t]*\n\s*\n\s*")
+
+
+def _strip_html(html: str) -> str:
+    text = re.sub(r"(?is)<(script|style).*?</\1>", " ", html or "")
+    text = re.sub(r"(?i)<(/p|/div|br\s*/?|/h[1-6])>", "\n", text)
+    text = _TAG_RE.sub("", text)
+    for entity, char in (("&nbsp;", " "), ("&amp;", "&"), ("&lt;", "<"),
+                         ("&gt;", ">"), ("&quot;", '"'), ("&#8217;", "'"),
+                         ("&#8220;", '"'), ("&#8221;", '"'), ("&mdash;", "—")):
+        text = text.replace(entity, char)
+    return _WS_RE.sub("\n\n", text).strip()
+
+
+def _fetch_text(url: str, timeout: int = 30) -> str:
+    req = urllib.request.Request(
+        url, headers={"User-Agent": "Executive Insight (research tool)"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read()
+    return raw.decode("utf-8", "replace")
+
+
+def fr_search_live(query: str, limit: int = 6, timeout: int = 25) -> list:
+    """Search federalregister.gov right now. Catches anything newer than the CSVs."""
+    key = f"search::{query.lower().strip()}::{limit}"
+    hit = _cache_get(key, SEARCH_TTL)
+    if hit is not None:
+        return hit
+
+    params = [("conditions[type][]", "PRESDOCU"),
+              ("conditions[term]", query),
+              ("per_page", str(limit)), ("order", "relevance")]
+    params += [("fields[]", f) for f in CSV_HEADER]
+    data = _fr_get(params, timeout=timeout)
+    rows = [{f: ("" if item.get(f) is None else str(item.get(f)))
+             for f in CSV_HEADER} for item in (data.get("results") or [])]
+    _cache_put(key, rows)
+    return rows
+
+
+def fr_document_text(document_number: str, max_chars: int = 9000,
+                     timeout: int = 30) -> str:
+    """
+    The plain text of one document. This is the piece the CSV archive has never
+    had — the metadata says an order exists, this says what it does.
+    """
+    document_number = (document_number or "").strip()
+    if not document_number:
+        return ""
+    key = f"text::{document_number}::{max_chars}"
+    hit = _cache_get(key, TEXT_TTL)
+    if hit is not None:
+        return hit
+
+    meta = _fr_get_url(FR_DOC_API.format(urllib.parse.quote(document_number)),
+                       [("fields[]", "raw_text_url"), ("fields[]", "body_html_url")],
+                       timeout=timeout)
+    text = ""
+    if meta.get("raw_text_url"):
+        text = _fetch_text(meta["raw_text_url"], timeout=timeout)
+    elif meta.get("body_html_url"):
+        text = _strip_html(_fetch_text(meta["body_html_url"], timeout=timeout))
+
+    text = _WS_RE.sub("\n\n", (text or "").strip())
+    if len(text) > max_chars:
+        text = text[:max_chars].rsplit("\n", 1)[0] + "\n[... text truncated ...]"
+    _cache_put(key, text)
+    return text
+
+
+def _fr_get_url(url: str, params, timeout: int = 30) -> dict:
+    full = url + ("?" + urllib.parse.urlencode(params, doseq=True) if params else "")
+    req = urllib.request.Request(
+        full, headers={"User-Agent": "Executive Insight (research tool)",
+                       "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
 def _fr_get(params, timeout=60) -> dict:
     url = FR_API + "?" + urllib.parse.urlencode(params, doseq=True)
     req = urllib.request.Request(
@@ -483,19 +616,117 @@ class LLMClient:
         except urllib.error.URLError as e:
             raise LLMError(f"Network error — {e.reason}") from None
 
-    def get_models(self, timeout: int = 20) -> list:
-        """Live model list (OpenRouter). Falls back to the shortlist."""
+    # Ids people type that aren't models. "openrouter/free" is NOT in here:
+    # it is a real router. Anything genuinely unknown is warned about, never
+    # blocked, because this list will always lag OpenRouter's catalogue.
+    MODEL_ALIASES = ("free", "openrouter free", "free models", "any/free",
+                     "free/free", "openrouter/free-models")
+
+    def catalogue(self, timeout: int = 20, force: bool = False) -> list:
+        """
+        Every model id OpenRouter currently offers, with pricing. The endpoint
+        needs no key, so this works before one is set. Cached for the session.
+        """
         if self.provider != "openrouter":
-            return list(OPENAI_MODELS)
+            return [{"id": m, "free": False} for m in OPENAI_MODELS]
+        cached = getattr(self, "_catalogue", None)
+        if cached and not force:
+            return cached
         try:
-            req = urllib.request.Request(self.base_url + "/models",
-                                         headers=self._headers())
+            req = urllib.request.Request(
+                self.base_url + "/models",
+                headers={"User-Agent": "Executive Insight (research tool)"})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-            ids = sorted({m.get("id", "") for m in data.get("data", []) if m.get("id")})
-            return ids or list(OPENROUTER_MODELS)
+            out = []
+            for m in data.get("data", []):
+                mid = m.get("id")
+                if not mid:
+                    continue
+                price = m.get("pricing") or {}
+                free = (str(price.get("prompt", "1")) in ("0", "0.0")
+                        and str(price.get("completion", "1")) in ("0", "0.0"))
+                out.append({"id": mid, "free": free or mid.endswith(":free")})
+            if out:
+                self._catalogue = sorted(out, key=lambda m: m["id"])
+                return self._catalogue
         except Exception:
-            return list(OPENROUTER_MODELS)
+            pass
+        return [{"id": m, "free": m.endswith(":free")}
+                for m in OPENROUTER_MODELS + OPENROUTER_FREE_MODELS]
+
+    def get_models(self, timeout: int = 20, free_only: bool = False) -> list:
+        """Model ids for the picker, optionally only the free ones."""
+        if self.provider != "openrouter":
+            return list(OPENAI_MODELS)
+        cat = self.catalogue(timeout=timeout)
+        ids = [m["id"] for m in cat if m["free"]] if free_only \
+            else [m["id"] for m in cat]
+        if not ids:
+            ids = list(OPENROUTER_FREE_MODELS if free_only else OPENROUTER_MODELS)
+        # Routers dispatch to concrete models, so the catalogue may not list
+        # them; surface them first regardless.
+        routers = [r for r in OPENROUTER_ROUTERS
+                   if (not free_only or r == "openrouter/free")]
+        return routers + [i for i in ids if i not in routers]
+
+    def validate_model(self, name: str):
+        """
+        Check a typed model id before it gets saved.
+
+        Returns (ok, message, suggestions). ok=True with a message means it
+        could not be checked (offline), not that it is known good.
+        """
+        name = (name or "").strip()
+        if not name:
+            return False, "No model set.", []
+
+        if self.provider == "openrouter" and name in OPENROUTER_ROUTERS:
+            return True, OPENROUTER_ROUTERS[name] + ".", []
+
+        if name.lower() in self.MODEL_ALIASES:
+            return (False,
+                    f"'{name}' is not a model id. For free inference use the "
+                    f"router 'openrouter/free', or a specific model's free "
+                    f"variant such as 'deepseek/deepseek-r1:free'. Tick "
+                    f"'Free only' to list what is available right now.",
+                    ["openrouter/free"] + self.get_models(free_only=True)[:5])
+
+        if self.provider != "openrouter":
+            return (name in OPENAI_MODELS, "", OPENAI_MODELS[:6])
+
+        cat = self.catalogue()
+        ids = [m["id"] for m in cat]
+        if not ids:
+            return True, "Could not reach OpenRouter to verify the model id.", []
+        if name in ids:
+            # Valid, but point out when the same model is also offered free.
+            if not name.endswith(":free") and name + ":free" in ids:
+                return (True, f"Note: '{name}:free' is the same model at no "
+                              f"cost, with tighter rate limits.",
+                        [name + ":free"])
+            return True, "", []
+
+        # The usual near-miss: the right model, without the :free suffix.
+        if name + ":free" in ids:
+            return (False,
+                    f"'{name}' exists but is the paid variant. The free one is "
+                    f"'{name}:free'.", [name + ":free"])
+        if name.endswith(":free") and name[:-5] in ids:
+            return (False,
+                    f"'{name}' has no free variant right now. The paid one is "
+                    f"'{name[:-5]}'.", [name[:-5]])
+
+        import difflib
+        close = difflib.get_close_matches(name, ids, n=5, cutoff=0.5)
+        if not close:
+            head = name.split("/")[0].lower()
+            close = [i for i in ids if i.lower().startswith(head)][:5]
+        # A warning, not a refusal: the catalogue may be stale or incomplete,
+        # and being wrong here must never stop a working model from being used.
+        return (True,
+                f"'{name}' wasn't in the catalogue just fetched. Trying it "
+                f"anyway \u2014 if it works, it works.", close)
 
     # -- reasoning / thinking models -----------------------------------------
     # Models that think before answering behave differently in three ways:
@@ -503,11 +734,44 @@ class LLMClient:
     # back in a separate field, and the whole budget can be spent thinking so
     # that "content" arrives empty. All three are handled here.
 
-    THINK_TAGS = re.compile(
-        r"<(think|thinking|reasoning|thought|scratchpad)>.*?</\1>",
-        re.DOTALL | re.IGNORECASE)
-    UNCLOSED_THINK = re.compile(
-        r"^\s*<(think|thinking|reasoning|thought|scratchpad)>.*", re.DOTALL | re.IGNORECASE)
+    # Chain-of-thought escapes in more shapes than one. This covers all of
+    # them: XML-ish tags, pipe-delimited tags, fenced blocks, a stray closing
+    # tag with no opener, explicit "final answer" markers, and models that just
+    # narrate their deliberation in plain prose with no markup at all.
+
+    _TAG_NAMES = (r"think|thinking|thoughts?|reason(?:ing)?|scratch(?:pad)?|"
+                  r"analysis|reflection|deliberation|inner_monologue|plan|"
+                  r"antthinking")
+
+    THINK_TAGS = re.compile(rf"<({_TAG_NAMES})\s*>.*?</\1\s*>",
+                            re.DOTALL | re.IGNORECASE)
+    PIPE_TAGS = re.compile(rf"<\|?({_TAG_NAMES})\|?>.*?<\|?/\1\|?>",
+                           re.DOTALL | re.IGNORECASE)
+    BRACKET_TAGS = re.compile(rf"\[({_TAG_NAMES})\].*?\[/\1\]",
+                              re.DOTALL | re.IGNORECASE)
+    FENCED = re.compile(rf"```(?:{_TAG_NAMES})\b.*?```", re.DOTALL | re.IGNORECASE)
+    ANY_OPEN = re.compile(rf"<\|?({_TAG_NAMES})\|?\s*>", re.IGNORECASE)
+    ANY_CLOSE = re.compile(rf"<\|?/({_TAG_NAMES})\|?\s*>", re.IGNORECASE)
+
+    # A heading the model puts in front of its real answer. Handles "Answer:",
+    # "**Answer:**", "## Final Answer -" and friends, on their own line or
+    # inline before the text.
+    FINAL_MARKER = re.compile(
+        r"^[ \t]*(?:#{1,4}[ \t]*)?(?:\*\*|__)?[ \t]*"
+        r"(?:final answer|final response|answer|response|conclusion)"
+        r"[ \t]*[:\-\u2014]?[ \t]*(?:\*\*|__)?[ \t]*[:\-\u2014]?[ \t]*",
+        re.IGNORECASE | re.MULTILINE)
+
+    # Openers that mean the model started narrating instead of answering.
+    DELIBERATION = re.compile(
+        r"^\s*(?:(?:okay|ok|alright|right|so|hmm|well|now|sure|got it)"
+        r"[,.\u2014-]?\s*){0,3}"
+        r"(?:let me|let's|i need to|i should|i'll|i will|i must|first,? i|"
+        r"the user (?:is )?(?:asking|wants|needs|said)|looking at (?:the|these)|"
+        r"we need to|to answer this|my task|the question asks|i see that|"
+        r"i'm going to|going through|based on my|breaking this down|"
+        r"i have to|checking the|scanning the)",
+        re.IGNORECASE)
 
     @staticmethod
     def looks_like_reasoner(model: str) -> bool:
@@ -519,19 +783,79 @@ class LLMClient:
 
     @classmethod
     def strip_thinking(cls, text: str) -> str:
-        """Remove chain-of-thought so only the answer reaches the user."""
+        """Return only the answer. Everything deliberative is removed."""
         if not text:
             return ""
-        out = cls.THINK_TAGS.sub("", text)
-        # A budget cut mid-thought leaves an opening tag with no close.
-        if cls.UNCLOSED_THINK.match(out):
-            for marker in ("</think>", "</thinking>", "</reasoning>"):
-                if marker in out:
-                    out = out.split(marker, 1)[1]
-                    break
-            else:
-                out = ""
+        out = text
+
+        # 1. Paired blocks in every markup style the models use.
+        for pattern in (cls.THINK_TAGS, cls.PIPE_TAGS, cls.BRACKET_TAGS, cls.FENCED):
+            out = pattern.sub("", out)
+
+        # 2. A closing tag with no opener — the opener was consumed upstream, so
+        #    everything before the close is thought. Take the last one.
+        closes = list(cls.ANY_CLOSE.finditer(out))
+        if closes:
+            out = out[closes[-1].end():]
+
+        # 3. An opener with no close: the budget ran out mid-thought, and
+        #    nothing after it is usable.
+        opener = cls.ANY_OPEN.search(out)
+        if opener:
+            out = out[:opener.start()]
+
+        out = out.strip()
+
+        # 4. An explicit "Final answer:" heading — keep what follows it, but
+        #    only when what precedes it actually reads like deliberation, so a
+        #    legitimate section heading isn't treated as a cut point.
+        markers = [m for m in cls.FINAL_MARKER.finditer(out)
+                   # Needs punctuation ("Answer:") or to stand alone on its own
+                   # line ("## Final Answer"), so a paragraph that merely begins
+                   # with the word "Answer" isn't mistaken for a heading.
+                   if any(ch in m.group(0) for ch in ":-\u2014")
+                   or m.end() >= len(out) or out[m.end()] == "\n"]
+        if markers:
+            last = markers[-1]
+            before, after = out[:last.start()], out[last.end():].strip()
+            if after and cls._is_deliberative(before):
+                out = after
+
+        # 5. Untagged narration: drop leading paragraphs that open with a
+        #    deliberation cue, provided a real answer remains behind them.
+        out = cls._drop_narration(out)
         return out.strip()
+
+    @classmethod
+    def _is_deliberative(cls, text: str) -> bool:
+        if not text.strip():
+            return False
+        if cls.DELIBERATION.search(text):
+            return True
+        cues = ("step 1", "let me", "let's", "i'll check", "first,", "wait,",
+                "actually,", "hmm", "thinking through", "my reasoning")
+        low = text.lower()
+        return sum(cue in low for cue in cues) >= 2
+
+    @classmethod
+    def _drop_narration(cls, text: str) -> str:
+        paragraphs = re.split(r"\n\s*\n", text)
+        if len(paragraphs) < 2:
+            return text
+        keep = 0
+        for para in paragraphs:
+            if cls.DELIBERATION.match(para.strip()):
+                keep += 1
+            else:
+                break
+        if not keep:
+            return text
+        remainder = "\n\n".join(paragraphs[keep:]).strip()
+        # The loop stops at the first paragraph that isn't deliberative, so a
+        # non-empty remainder is by definition the answer — however short. An
+        # empty one means the whole reply was narration, and showing that beats
+        # showing a blank bubble.
+        return remainder if remainder else text
 
     @staticmethod
     def _extract(choice: dict):
@@ -548,10 +872,15 @@ class LLMClient:
                                 if isinstance(p, dict))
         return (content or choice.get("text") or ""), (reasoning or "")
 
-    def _build_payload(self, messages, max_tokens, temperature):
+    def _build_payload(self, messages, max_tokens, temperature, web=False):
         model = self.model
         payload = {"model": model, "messages": messages}
         reasoner = self.looks_like_reasoner(model)
+
+        # OpenRouter can run a web search alongside any model and hand the
+        # results to it before it answers.
+        if web and self.provider == "openrouter":
+            payload["plugins"] = [{"id": "web", "max_results": 3}]
 
         # Thinking tokens are billed against the same budget as the answer, so
         # a normal ceiling can leave nothing for the reply.
@@ -564,15 +893,21 @@ class LLMClient:
             payload["max_tokens"] = payload_tokens
             payload["temperature"] = temperature
 
-        if self.provider == "openrouter" and reasoner:
-            # Keep the thinking short; we only want the conclusion.
-            payload["reasoning"] = {"effort": "low"}
+        if self.provider == "openrouter":
+            # Always exclude reasoning tokens, not just for models detected as
+            # reasoners: a router like openrouter/free can hand the request to
+            # a reasoning model without the id ever saying so. Effort is only
+            # capped when we know it thinks. Both are ignored by models that
+            # don't reason.
+            payload["reasoning"] = {"exclude": True}
+            if reasoner:
+                payload["reasoning"]["effort"] = "low"
         return payload
 
     # -- generation ----------------------------------------------------------
     def complete(self, system: str, user: str,
                  max_tokens: int = 800, temperature: float = 0.0,
-                 history=None) -> str:
+                 history=None, web: bool = False) -> str:
         model = self.model
         history = list(history or [])
 
@@ -598,11 +933,14 @@ class LLMClient:
         budget = max_tokens
         for attempt in (1, 2):
             data = self._post("/chat/completions",
-                              self._build_payload(messages, budget, temperature),
-                              timeout=180 if reasoner else 90)
+                              self._build_payload(messages, budget, temperature,
+                                                  web=web),
+                              timeout=180 if (reasoner or web) else 90)
             choice = (data.get("choices") or [{}])[0]
             raw, reasoning = self._extract(choice)
             answer = self.strip_thinking(raw)
+            if answer:
+                answer = self._append_citations(answer, choice)
             self.last_reasoning = reasoning or self.THINK_TAGS.findall(raw or "")
 
             if answer:
@@ -627,6 +965,21 @@ class LLMClient:
             raise LLMError(f"'{model}' returned an empty response "
                            f"(finish_reason: {finish}).")
         return ""
+
+    @staticmethod
+    def _append_citations(answer: str, choice: dict) -> str:
+        """Surface the sources a web search actually used."""
+        msg = choice.get("message") or {}
+        urls = []
+        for note in (msg.get("annotations") or []):
+            cite = note.get("url_citation") or {}
+            url = cite.get("url")
+            if url and url not in urls:
+                urls.append(url)
+        if not urls:
+            return answer
+        lines = "\n".join("  " + u for u in urls[:5])
+        return answer + "\n\nWeb sources:\n" + lines
 
     def test(self):
         """Return (ok: bool, message: str)."""
@@ -761,7 +1114,40 @@ completely different claims.
   - The Historical database overlaps the per-president ones, so the same order \
 can appear twice. Report it once.
 
+LIVE MATERIAL
+Some messages carry blocks marked LIVE, fetched from federalregister.gov at the \
+moment you were asked. Treat them as more current than the archive: the CSVs \
+have a cutoff and live results do not. Where the two disagree about a date, a \
+citation or a status, the live block wins, and it is worth saying briefly that \
+the archive copy differs. A live block flagged NOT IN THE LOCAL ARCHIVE is a \
+document published since the CSVs were built; say so when you cite it.
+
+A block marked LIVE FULL TEXT contains the real text of the order. When you \
+have it, the restriction above is lifted for that document: you may describe \
+what it actually provides, section by section, and quote short passages. These \
+are U.S. government works in the public domain. Quote sparingly and \
+purposefully, a sentence or two where the exact wording matters, and summarise \
+the rest. Never present the text of one order as the text of another, and if \
+the excerpt is truncated say so instead of guessing at the ending.
+
+If a message says the live lookup failed or returned nothing, answer from the \
+archive and mention in one line that you could not reach the live source, so \
+the reader knows the answer may not reflect the last few weeks.
+
+Web search results, when present, come from the open internet rather than the \
+Federal Register. They are useful for context and reporting, but they are not \
+authoritative for what a document says: prefer the Federal Register text and \
+metadata whenever both are available, and attribute anything that came from \
+the wider web to its source.
+
 HOW TO ANSWER
+Give the finished answer only. Do not narrate your process, do not think out \
+loud on the page, and do not show your working. Nothing that reads like "Let me \
+check the records", "First I'll look at", "The user is asking", "Okay, so" or \
+"Final answer:" belongs in the reply — start directly with the substance. Do \
+not restate the question before answering it, and do not add a closing summary \
+that repeats what you just said.
+
 Lead with the direct answer in a sentence or two, then the supporting records. \
 Reference documents as: EO 13805 (signed 2017-07-19). When only a publication \
 date exists, use it and label it as published. When listing several records, \
@@ -1166,6 +1552,83 @@ class LegalEngine:
         return "\n".join(f"{k}: {v}" for k, v in row.items()
                          if v and not str(k).startswith("_"))
 
+    # -- live internet lookup for the AI -------------------------------------
+    LIVE_MODES = ("off", "federal_register", "federal_register_web")
+
+    @property
+    def live_mode(self) -> str:
+        mode = str(self.settings.get("live_data", "federal_register")).lower()
+        return mode if mode in self.LIVE_MODES else "federal_register"
+
+    def live_lookup(self, user_query: str, max_docs: int = 4,
+                    max_text: int = 2, timeout: int = 25):
+        """
+        Go out to federalregister.gov for this question. Two things come back
+        that the local archive cannot provide: documents published since the
+        CSVs were built, and the actual text of an order rather than a title.
+
+        Returns (blocks, note). Never raises — offline just means no blocks.
+        """
+        blocks, seen = [], set()
+        wanted_texts = []
+
+        # Anything the question names by number gets its full text pulled.
+        for num in dict.fromkeys(_EO_RE.findall(user_query)):
+            for rid in self.by_eo.get(num, ())[:1]:
+                doc = str(self.records[rid].get("document_number", "")).strip()
+                if doc:
+                    wanted_texts.append((num, doc, self.records[rid]))
+
+        try:
+            fresh = fr_search_live(user_query, limit=max_docs, timeout=timeout)
+        except urllib.error.URLError as e:
+            return [], f"Live lookup unavailable ({e.reason}); archive only."
+        except Exception as e:
+            return [], f"Live lookup failed ({type(e).__name__}); archive only."
+
+        known = {self._dedupe_key(r) for r in self.records}
+        for row in fresh:
+            key = self._dedupe_key(row)
+            if key in seen:
+                continue
+            seen.add(key)
+            is_new = key not in known
+            eo = row.get("executive_order_number", "").strip()
+            head = (f"[LIVE] " + (f"EO {eo}" if eo else "(no EO number)")
+                    + f" \u00b7 signed {row.get('signing_date') or '\u2014'}"
+                    + (" \u00b7 NOT IN THE LOCAL ARCHIVE" if is_new else ""))
+            body = [head,
+                    f"    Title: {row.get('title', '')}",
+                    f"    Notes: {row.get('disposition_notes') or '(none recorded)'}"]
+            if row.get("html_url"):
+                body.append(f"    Link: {row['html_url']}")
+            blocks.append("\n".join(body))
+            if len(wanted_texts) < max_text and row.get("document_number"):
+                wanted_texts.append((eo, row["document_number"], row))
+
+        # Full text for at most a couple of documents — it is the expensive part.
+        pulled = 0
+        for eo, doc, row in wanted_texts:
+            if pulled >= max_text:
+                break
+            try:
+                text = fr_document_text(doc, timeout=timeout)
+            except Exception:
+                continue
+            if not text:
+                continue
+            pulled += 1
+            blocks.append(
+                f"[LIVE FULL TEXT] EO {eo or '\u2014'} \u00b7 "
+                f"{row.get('title', '')}\n"
+                f"Retrieved from federalregister.gov just now. This is the "
+                f"actual document text:\n\n{text}")
+
+        note = ""
+        if not blocks:
+            note = "Live lookup returned nothing; answering from the archive."
+        return blocks, note
+
     # -- AI ------------------------------------------------------------------
     def coverage_block(self) -> str:
         """Exact per-database totals and date spans — the model's ground truth."""
@@ -1227,23 +1690,42 @@ class LegalEngine:
         return "\n".join(out)
 
     def build_context(self, user_query: str, k: int = 25,
-                      char_budget: int = 14000):
+                      char_budget: int = 14000, live=None):
+        # Live material is worth more than another twenty archive rows, so it
+        # gets its budget first and the local sample fills what's left.
+        live_blocks, live_note = [], ""
+        if live is None:
+            live = self.live_mode != "off"
+        if live:
+            live_blocks, live_note = self.live_lookup(user_query)
+
+        live_text = "\n\n".join(live_blocks)
+        remaining = max(char_budget - len(live_text), 3000)
+
         hits = self.search(user_query, limit=k)
         blocks, used = [], 0
         for i, row in enumerate(hits, 1):
             block = self._record_block(row, i)
-            if used + len(block) > char_budget:
+            if used + len(block) > remaining:
                 break
             blocks.append(block)
             used += len(block)
 
         if blocks:
-            body = (f"TOP {len(blocks)} MATCHING RECORDS (a ranked sample, not "
-                    f"a complete set):\n\n" + "\n\n".join(blocks))
+            body = (f"TOP {len(blocks)} MATCHING ARCHIVE RECORDS (a ranked "
+                    f"sample, not a complete set):\n\n" + "\n\n".join(blocks))
         else:
-            body = ("TOP MATCHING RECORDS: none. Nothing in the loaded "
+            body = ("TOP MATCHING ARCHIVE RECORDS: none. Nothing in the loaded "
                     "databases matched this question.")
-        return self.coverage_block() + "\n\n" + body, hits
+
+        parts = [self.coverage_block(), body]
+        if live_text:
+            parts.append("LIVE FROM FEDERALREGISTER.GOV (fetched moments ago, "
+                         "authoritative and newer than the archive):\n\n"
+                         + live_text)
+        elif live and live_note:
+            parts.append("LIVE LOOKUP: " + live_note)
+        return "\n\n".join(parts), hits
 
     def query_ai(self, user_query: str, k: int = 25, use_history: bool = True) -> str:
         context, _ = self.build_context(user_query, k=k)
@@ -1252,7 +1734,8 @@ class LegalEngine:
         history = self.chat_history[-6:] if use_history else []
         answer = self.llm.complete(SYSTEM_PROMPT, prompt,
                                    max_tokens=1400, temperature=0,
-                                   history=history)
+                                   history=history,
+                                   web=(self.live_mode == "federal_register_web"))
         if use_history:
             # Store the question without its context so history stays cheap.
             self.chat_history.append({"role": "user", "content": user_query})
@@ -1330,7 +1813,9 @@ class LegalEngine:
                       '"topics": ["up to 4 short tags"], '
                       '"impact": "High|Medium|Low", '
                       '"agencies": ["agencies named or affected"]}. '
-                      "Use only the title and notes given. Empty list if unknown.")
+                      "Use only the title and notes given. Empty list if "
+                      "unknown. Output the JSON array and nothing else \u2014 no "
+                      "reasoning, no commentary, no preamble.")
             try:
                 parsed = _parse_json_array(
                     self.llm.complete(system, listing, max_tokens=1200, temperature=0))

@@ -536,6 +536,7 @@ class Sidebar(ctk.CTkFrame):
             ("Economy",      "  Economy"),
             ("Congress",     "  Congress"),
             ("Supreme Court","  Supreme Court"),
+            ("About",       "  About Us"),
         ]
         for key, label in nav_items:
             btn = SidebarButton(self, label, lambda k=key: on_select(k))
@@ -715,18 +716,17 @@ class DashboardPanel(ctk.CTkFrame):
     def _build(self, engine):
         # ── Header ────────────────────────────────────────────────────────
         hdr = ctk.CTkFrame(self, fg_color="transparent")
-        hdr.pack(fill="x", padx=40, pady=(32, 0))
+        hdr.pack(fill="x", padx=40, pady=(28, 0))
 
         ctk.CTkLabel(hdr, text="Platform Overview",
                      font=("Georgia", 24, "bold"),
                      text_color=PALETTE["text_primary"], anchor="w").pack(side="left")
 
-        # Live indicator
         live = ctk.CTkFrame(hdr, fg_color=PALETTE["surface_2"], corner_radius=4,
-                             border_width=1, border_color=PALETTE["border"])
+                            border_width=1, border_color=PALETTE["border"])
         live.pack(side="right", pady=6)
         dot = ctk.CTkFrame(live, width=7, height=7, corner_radius=4,
-                            fg_color=PALETTE["positive"])
+                           fg_color=PALETTE["positive"])
         dot.pack(side="left", padx=(10, 4), pady=6)
         dot.pack_propagate(False)
         ctk.CTkLabel(live, text="LIVE  ",
@@ -739,11 +739,11 @@ class DashboardPanel(ctk.CTkFrame):
                      text_color=PALETTE["text_secondary"], anchor="w"
                      ).pack(fill="x", padx=40, pady=(4, 12))
 
-        # ── Global Search bar ─────────────────────────────────────────────
+        # ── Global search bar ─────────────────────────────────────────────
         search_bar = ctk.CTkFrame(self, fg_color=PALETTE["surface"],
-                                   corner_radius=10, border_width=1,
-                                   border_color=PALETTE["accent"])
-        search_bar.pack(fill="x", padx=40, pady=(0, 16))
+                                  corner_radius=10, border_width=1,
+                                  border_color=PALETTE["accent"])
+        search_bar.pack(fill="x", padx=40, pady=(0, 12))
         tr(search_bar, fg_color="surface", border_color="accent")
 
         self._search_entry = ctk.CTkEntry(
@@ -752,35 +752,31 @@ class DashboardPanel(ctk.CTkFrame):
             placeholder_text_color=PALETTE["text_dim"],
             fg_color="transparent", border_width=0,
             text_color=PALETTE["text_primary"], font=("Georgia", 13))
-        self._search_entry.pack(side="left", fill="x", expand=True, padx=16, pady=10)
+        self._search_entry.pack(side="left", fill="x", expand=True, padx=16, pady=8)
         self._search_debouncer = _Debouncer(280)
         self._search_entry.bind("<Return>", lambda e: self._do_search())
         self._search_entry.bind("<KeyRelease>", lambda e: self._search_debouncer.call(
             self._search_entry, self._live_search))
         tr(self._search_entry, text_color="text_primary")
 
-        ctk.CTkButton(search_bar, text="Search", width=90, height=34,
+        ctk.CTkButton(search_bar, text="Search", width=90, height=32,
                       corner_radius=8,
                       fg_color=PALETTE["accent"], hover_color=PALETTE["accent_dim"],
                       text_color=PALETTE["bg"], font=("Courier New", 11, "bold"),
                       command=self._do_search).pack(side="right", padx=10, pady=8)
 
-        ctk.CTkButton(search_bar, text="✕", width=30, height=34,
+        ctk.CTkButton(search_bar, text="✕", width=30, height=32,
                       corner_radius=8,
                       fg_color="transparent", hover_color=PALETTE["border"],
                       text_color=PALETTE["text_dim"], font=("Courier New", 11),
                       command=self._clear_search).pack(side="right", padx=(0, 2), pady=8)
 
-        # Search results panel (hidden until search active)
+        # Search results panel (hidden until a search is active).
+        # The count label is packed FIRST so it sits above the results.
         self._search_results_frame = ctk.CTkFrame(self, fg_color=PALETTE["surface"],
-                                                    corner_radius=10, border_width=1,
-                                                    border_color=PALETTE["border"])
+                                                  corner_radius=10, border_width=1,
+                                                  border_color=PALETTE["border"])
         tr(self._search_results_frame, fg_color="surface", border_color="border")
-
-        self._search_results_inner = ctk.CTkScrollableFrame(
-            self._search_results_frame, fg_color="transparent",
-            scrollbar_button_color=PALETTE["border"])
-        self._search_results_inner.pack(fill="both", expand=True, padx=8, pady=8)
 
         self._search_count = tr(ctk.CTkLabel(
             self._search_results_frame, text="",
@@ -789,48 +785,60 @@ class DashboardPanel(ctk.CTkFrame):
             text_color="text_dim")
         self._search_count.pack(fill="x", padx=16, pady=(8, 0))
 
-        # Build corpus for search
+        self._search_results_inner = ctk.CTkScrollableFrame(
+            self._search_results_frame, fg_color="transparent",
+            scrollbar_button_color=PALETTE["border"])
+        self._search_results_inner.pack(fill="both", expand=True, padx=8, pady=8)
+
         self._corpus = self._build_search_corpus()
-        # Pre-build lowercase index for O(1) search matching
         self._search_index = [
             (item, " ".join([item["label"], item["meta"], item["detail"]]).lower())
             for item in self._corpus
         ]
         self._search_active = False
 
-        # ── Stat cards ────────────────────────────────────────────────────
+        # ── Stat cards (3, evenly spaced) ─────────────────────────────────
         stats_frame = ctk.CTkFrame(self, fg_color="transparent")
-        stats_frame.pack(fill="x", padx=40, pady=(0, 16))
+        stats_frame.pack(fill="x", padx=40, pady=(0, 14))
+        for i in range(3):
+            stats_frame.grid_columnconfigure(i, weight=1, uniform="stat")
 
-        self._stat_card(stats_frame, "DATABASE RECORDS", str(len(engine.records)), 0)
-        self._stat_card(stats_frame, "ACTIVE LIBRARIES",  str(len(engine.csv_files)),        1)
-        self._stat_card(stats_frame, "ACTIVE CONFLICTS",  "2",                               2)
-        self._stat_card(stats_frame, "AI STATUS",         "CONNECTED",                       3)
+        self._stat_card(stats_frame, "DATABASE RECORDS", f"{len(engine.records):,}", 0)
+        self._stat_card(stats_frame, "ACTIVE LIBRARIES", str(len(engine.csv_files)), 1)
+        self._stat_card(stats_frame, "ACTIVE CONFLICTS", "2", 2)
 
-        # ── Main content area (events + filters) ──────────────────────────
+        # ── Recent events (full width, compact) ───────────────────────────
         self._main_content = ctk.CTkFrame(self, fg_color="transparent")
-        self._main_content.pack(fill="both", expand=True, padx=40, pady=(0, 32))
-        self._main_content.columnconfigure(0, weight=3)
-        self._main_content.columnconfigure(1, weight=1)
+        self._main_content.pack(fill="both", expand=True, padx=40, pady=(0, 24))
 
-        # Feed column
-        feed_frame = ctk.CTkFrame(self._main_content, fg_color="transparent")
-        feed_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 16))
-
-        feed_hdr = ctk.CTkFrame(feed_frame, fg_color="transparent")
-        feed_hdr.pack(fill="x", pady=(0, 10))
+        feed_hdr = ctk.CTkFrame(self._main_content, fg_color="transparent")
+        feed_hdr.pack(fill="x", pady=(0, 8))
 
         ctk.CTkLabel(feed_hdr, text="RECENT EVENTS & HISTORY",
                      font=("Courier New", 9, "bold"),
                      text_color=PALETTE["text_dim"], anchor="w").pack(side="left")
-
-        ctk.CTkLabel(feed_hdr,
-                     text=f"{len(self.EVENTS)} events",
+        ctk.CTkLabel(feed_hdr, text=f"  {len(self.EVENTS)} events",
                      font=("Courier New", 9),
-                     text_color=PALETTE["text_dim"]).pack(side="right")
+                     text_color=PALETTE["text_dim"]).pack(side="left")
+
+        # Category filter chips, right-aligned in the feed header
+        chips = ctk.CTkFrame(feed_hdr, fg_color="transparent")
+        chips.pack(side="right")
+        self._filter_btns = {}
+        for cat in ["ALL", "WAR", "POLITICS", "POLICY", "GOVERNMENT", "LEGAL", "CRISIS"]:
+            btn = ctk.CTkButton(
+                chips, text=cat, height=24, width=len(cat) * 9 + 20,
+                corner_radius=12,
+                fg_color=PALETTE["accent"] if cat == "ALL" else PALETTE["surface_2"],
+                hover_color=PALETTE["accent_dim"],
+                text_color=PALETTE["bg"] if cat == "ALL" else PALETTE["text_secondary"],
+                font=("Courier New", 9, "bold"),
+                command=lambda c=cat: self._filter(c))
+            btn.pack(side="left", padx=(0, 4))
+            self._filter_btns[cat] = btn
 
         self._feed_scroll = ctk.CTkScrollableFrame(
-            feed_frame, fg_color=PALETTE["surface"],
+            self._main_content, fg_color=PALETTE["surface"],
             corner_radius=10, border_width=1, border_color=PALETTE["border"],
             scrollbar_button_color=PALETTE["border"],
         )
@@ -838,53 +846,6 @@ class DashboardPanel(ctk.CTkFrame):
         self._event_cards = []
         self._active_filter = "ALL"
         self._render_feed("ALL")
-
-        # Filter column
-        filter_frame = ctk.CTkFrame(self._main_content, fg_color="transparent")
-        filter_frame.grid(row=0, column=1, sticky="nsew")
-
-        ctk.CTkLabel(filter_frame, text="FILTER BY CATEGORY",
-                     font=("Courier New", 9, "bold"),
-                     text_color=PALETTE["text_dim"], anchor="w").pack(fill="x", pady=(0, 10))
-
-        categories = ["ALL", "WAR", "POLITICS", "POLICY", "GOVERNMENT", "LEGAL", "CRISIS"]
-        self._filter_btns = {}
-        for cat in categories:
-            btn = ctk.CTkButton(
-                filter_frame,
-                text=cat,
-                height=34, corner_radius=6,
-                fg_color=PALETTE["accent"] if cat == "ALL" else PALETTE["surface_2"],
-                hover_color=PALETTE["accent_dim"],
-                text_color=PALETTE["bg"] if cat == "ALL" else PALETTE["text_secondary"],
-                font=("Courier New", 10, "bold"),
-                command=lambda c=cat: self._filter(c)
-            )
-            btn.pack(fill="x", pady=(0, 6))
-            self._filter_btns[cat] = btn
-
-        # Ongoing alerts box
-        ctk.CTkLabel(filter_frame, text="ACTIVE ALERTS",
-                     font=("Courier New", 9, "bold"),
-                     text_color=PALETTE["text_dim"], anchor="w").pack(fill="x", pady=(16, 8))
-
-        alerts = [
-            ("● Iran War",         "Ongoing since Feb 28",  "danger"),
-            ("● DHS Shutdown",     "Ongoing since Feb 14",  "warning"),
-            ("● Travel Ban",       "39 countries, active",  "warning"),
-        ]
-        for label, sub, color_key in alerts:
-            alert_card = ctk.CTkFrame(filter_frame, fg_color=PALETTE["surface"],
-                                       corner_radius=6, border_width=1,
-                                       border_color=PALETTE["border"])
-            alert_card.pack(fill="x", pady=(0, 6))
-            ctk.CTkLabel(alert_card, text=label,
-                         font=("Courier New", 10, "bold"),
-                         text_color=PALETTE.get(color_key, PALETTE["accent"]),
-                         anchor="w").pack(fill="x", padx=12, pady=(8, 2))
-            ctk.CTkLabel(alert_card, text=sub,
-                         font=("Courier New", 9),
-                         text_color=PALETTE["text_dim"], anchor="w").pack(fill="x", padx=12, pady=(0, 8))
 
     # ── Search corpus ─────────────────────────────────────────────────────────
     def _build_search_corpus(self):
@@ -1000,25 +961,22 @@ class DashboardPanel(ctk.CTkFrame):
     def _stat_card(self, master, title, value, col):
         card = ctk.CTkFrame(master, fg_color=PALETTE["surface"],
                             border_color=PALETTE["border"], border_width=1,
-                            corner_radius=8, height=100)
-        card.grid(row=0, column=col, padx=(0, 14) if col < 3 else 0, sticky="nsew")
-        master.grid_columnconfigure(col, weight=1)
+                            corner_radius=8)
+        card.grid(row=0, column=col, padx=(0, 12) if col < 2 else 0, sticky="nsew")
         tr(card, fg_color="surface", border_color="border")
 
         tr(ctk.CTkLabel(card, text=title, font=("Courier New", 9, "bold"),
-                     text_color=PALETTE["text_secondary"]),
-           text_color="text_secondary").pack(pady=(16, 4))
-        tr(ctk.CTkLabel(card, text=value, font=("Georgia", 18, "bold"),
-                     text_color=PALETTE["accent"]),
-           text_color="accent").pack(pady=(0, 16))
+                        text_color=PALETTE["text_secondary"]),
+           text_color="text_secondary").pack(pady=(12, 0))
+        tr(ctk.CTkLabel(card, text=value, font=("Georgia", 20, "bold"),
+                        text_color=PALETTE["accent"]),
+           text_color="accent").pack(pady=(0, 12))
 
     def _filter(self, category):
         self._active_filter = category
-        # Update button styles
         for cat, btn in self._filter_btns.items():
             if cat == category:
-                btn.configure(fg_color=PALETTE["accent"],
-                              text_color=PALETTE["bg"])
+                btn.configure(fg_color=PALETTE["accent"], text_color=PALETTE["bg"])
             else:
                 btn.configure(fg_color=PALETTE["surface_2"],
                               text_color=PALETTE["text_secondary"])
@@ -1028,76 +986,67 @@ class DashboardPanel(ctk.CTkFrame):
         # Build cards once, then just show/hide — no destroy/recreate
         if not self._event_cards:
             for event in self.EVENTS:
-                card = self._make_event_card(*event)
-                self._event_cards.append((event[1], card))   # (category, widget)
+                self._event_cards.append((event[1], self._make_event_card(*event)))
 
-        has_visible = False
         for cat, card in self._event_cards:
             if category == "ALL" or cat == category:
                 card.pack(fill="x")
-                has_visible = True
             else:
                 card.pack_forget()
 
-        if not has_visible:
-            ctk.CTkLabel(self._feed_scroll, text="No events in this category.",
-                         font=("Courier New", 11),
-                         text_color=PALETTE["text_dim"]).pack(pady=30)
-
     def _make_event_card(self, date, cat, headline, detail, color_key):
+        """Compact row: [bar] DATE  BADGE  Headline  /  one-to-two-line detail.
+        Click a row to expand or collapse its full detail text."""
         color = PALETTE.get(color_key, PALETTE["accent"])
         cat_color = PALETTE.get(
             self.CATEGORY_COLORS.get(cat, "text_secondary"),
-            PALETTE["text_secondary"]
-        )
+            PALETTE["text_secondary"])
 
         card = ctk.CTkFrame(self._feed_scroll, fg_color="transparent",
-                             corner_radius=0)
-        # NOTE: caller controls pack()
+                            corner_radius=0, cursor="hand2")
 
-        inner = ctk.CTkFrame(card, fg_color="transparent")
-        inner.pack(fill="x", padx=16, pady=10)
+        row = ctk.CTkFrame(card, fg_color="transparent")
+        row.pack(fill="x", padx=12, pady=(6, 6))
 
-        # Top row: date + category badge
-        top = ctk.CTkFrame(inner, fg_color="transparent")
-        top.pack(fill="x", pady=(0, 4))
+        ctk.CTkFrame(row, width=3, height=0, fg_color=color,
+                     corner_radius=2).pack(side="left", fill="y", padx=(0, 10))
 
-        # Left colour bar accent
-        ctk.CTkFrame(inner, width=3, height=0, fg_color=color,
-                     corner_radius=2).pack(side="left", fill="y", padx=(0, 12))
-
-        content = ctk.CTkFrame(inner, fg_color="transparent")
+        content = ctk.CTkFrame(row, fg_color="transparent")
         content.pack(side="left", fill="x", expand=True)
 
-        meta_row = ctk.CTkFrame(content, fg_color="transparent")
-        meta_row.pack(fill="x", pady=(0, 3))
+        meta = ctk.CTkFrame(content, fg_color="transparent")
+        meta.pack(fill="x")
 
-        ctk.CTkLabel(meta_row, text=date,
+        ctk.CTkLabel(meta, text=date, width=84,
                      font=("Courier New", 9, "bold"),
                      text_color=PALETTE["text_dim"], anchor="w").pack(side="left")
 
-        badge = ctk.CTkFrame(meta_row, fg_color=PALETTE["surface_2"],
-                              corner_radius=3)
-        badge.pack(side="left", padx=(8, 0))
-        ctk.CTkLabel(badge, text=cat,
-                     font=("Courier New", 8, "bold"),
-                     text_color=cat_color).pack(padx=6, pady=2)
+        badge = ctk.CTkFrame(meta, fg_color=PALETTE["surface_2"], corner_radius=3)
+        badge.pack(side="left", padx=(0, 8))
+        ctk.CTkLabel(badge, text=cat, font=("Courier New", 8, "bold"),
+                     text_color=cat_color).pack(padx=6, pady=1)
 
-        ctk.CTkLabel(content, text=headline,
-                     font=("Georgia", 12, "bold"),
-                     text_color=PALETTE["text_primary"],
-                     anchor="w", wraplength=520, justify="left"
-                     ).pack(fill="x", pady=(0, 4))
+        head = ctk.CTkLabel(meta, text=headline, font=("Georgia", 11, "bold"),
+                            text_color=PALETTE["text_primary"], anchor="w")
+        head.pack(side="left", fill="x", expand=True)
 
-        ctk.CTkLabel(content, text=detail,
-                     font=("Courier New", 10),
-                     text_color=PALETTE["text_secondary"],
-                     anchor="w", wraplength=520, justify="left"
-                     ).pack(fill="x")
+        short = detail if len(detail) <= 150 else detail[:147].rstrip() + "…"
+        body = ctk.CTkLabel(content, text=short, font=("Courier New", 9),
+                            text_color=PALETTE["text_secondary"],
+                            anchor="w", justify="left", wraplength=860)
+        body.pack(fill="x", pady=(2, 0))
 
-        # Divider
-        ctk.CTkFrame(card, height=1,
-                     fg_color=PALETTE["border"], corner_radius=0).pack(fill="x", padx=12)
+        state = {"open": False}
+
+        def _toggle(_e=None):
+            state["open"] = not state["open"]
+            body.configure(text=detail if state["open"] else short)
+
+        for w in (card, row, content, meta, head, body):
+            w.bind("<Button-1>", _toggle)
+
+        ctk.CTkFrame(card, height=1, fg_color=PALETTE["border"],
+                     corner_radius=0).pack(fill="x", padx=12)
         return card
 
 
@@ -3894,8 +3843,6 @@ class SettingsPanel(ctk.CTkFrame):
         self._build_provider(container)
         self._rule(container)
         self._build_data(container)
-        self._rule(container)
-        self._build_about(container)
 
     # ── appearance ────────────────────────────────────────────────────────
     def _build_appearance(self, container):
@@ -4414,12 +4361,34 @@ class SettingsPanel(ctk.CTkFrame):
         self._enrich_status.configure(text="Stopping after the current batch...",
                                       text_color=PALETTE["warning"])
 
-    # ── about ─────────────────────────────────────────────────────────────
-    def _build_about(self, container):
-        self._section(container, "ABOUT US")
+    def _on_theme_selected(self, name):
+        self.on_theme_change(name)
 
+
+class AboutPanel(ctk.CTkFrame):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, fg_color="transparent", **kwargs)
+        self._build()
+
+    def _build(self):
+        outer = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        outer.pack(fill="both", expand=True)
+
+        tr(ctk.CTkLabel(outer, text="About Us", font=("Georgia", 24, "bold"),
+                        text_color=PALETTE["text_primary"]),
+           text_color="text_primary").pack(anchor="w", padx=40, pady=(40, 20))
+
+        container = ctk.CTkFrame(outer, fg_color=PALETTE["surface"],
+                                 border_color=PALETTE["border"], border_width=1,
+                                 corner_radius=12)
+        container.pack(fill="x", padx=40, pady=(0, 40))
+        tr(container, fg_color="surface", border_color="border")
+
+        self._build_about(container)
+
+    def _build_about(self, container):
         about_frame = ctk.CTkFrame(container, fg_color="transparent")
-        about_frame.pack(fill="x", padx=30, pady=(0, 30))
+        about_frame.pack(fill="x", padx=30, pady=(24, 16))
         about_frame.columnconfigure(0, weight=1)
 
         card = ctk.CTkFrame(about_frame, fg_color=PALETTE["surface_2"],
@@ -4476,9 +4445,6 @@ class SettingsPanel(ctk.CTkFrame):
             font=("Georgia", 12, "italic"),
             text_color=PALETTE["accent"]), text_color="accent").pack(pady=16)
 
-    def _on_theme_selected(self, name):
-        self.on_theme_change(name)
-
 
 # ── Main Application ──────────────────────────────────────────────────────────
 
@@ -4522,6 +4488,7 @@ class ExecutiveInsight(ctk.CTk):
             "Economy":      lambda: EconomyPanel(ca),
             "Congress":     lambda: CongressPanel(ca),
             "Supreme Court":lambda: ScotusPanel(ca),
+            "About":        lambda: AboutPanel(ca),
             "Settings":     lambda: SettingsPanel(ca, on_theme_change=self._apply_theme, engine=en),
         }
         self._built_panels = {}

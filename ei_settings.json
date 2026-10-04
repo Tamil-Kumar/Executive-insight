@@ -1,0 +1,16 @@
+{
+  "appearance": "Dark",
+  "font_size": "Medium",
+  "results_limit": 200,
+  "window_size": "Fullscreen",
+  "data_folder": "",
+
+  "ai_provider": "openrouter",
+  "openrouter_key": "",
+  "openrouter_model": "openai/gpt-4o-mini",
+  "openai_key": "",
+  "openai_model": "gpt-4o-mini",
+
+  "openrouter_site": "https://executive-insight.local",
+  "openrouter_title": "Executive Insight"
+}
